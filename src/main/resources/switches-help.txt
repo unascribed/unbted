@@ -1,0 +1,60 @@
+Usage: unbted [options] [file]
+
+Una's NBT Editor
+
+Edit an NBT (Named Binary Tag) file interactively, or print it out in a
+JSON-like format for reading. Optionally convert it to well-formed JSON
+for processing.
+
+Type names prefixed with a ~ indicate inferred types, such as JSON strings
+or UUID long pairs. Type names prefixed with a ! indicate nonstandard
+OpenNBT extensions.
+
+Valid options:
+    -?, -h, --help
+        Print this help
+
+    -c=<method>, --compression=<method>
+        Assume the given compression method, rather than autodetecting
+        Valid methods are None, Deflate, and GZip
+
+    -d, -v, --debug, --verbose
+        Print more information and stacktraces
+
+    -e, --extended
+        Enable OpenNBT extensions
+            (incompatible with -o)
+
+    -o, --old
+        Disable newer additions to the NBT format, such as int arrays
+            (incompatible with -e)
+
+    -p, --print
+        Exit after printing file contents
+            (incompatible with -n)
+
+    -n, --no-print
+        Don't print out initial file contents, just edit
+            (incompatible with -p)
+
+    -l, --little
+        Assume the input is a malformed little-endian NBT file
+
+    -s, -j, --strict, --json
+        Print out well-formed JSON instead of a human-readable JSON-like
+        colored format
+            (implies -f and -6)
+
+    -6, --base64
+        Print byte arrays as Base64 instead of hex
+            (incompatible with -d)
+
+    -d, --decimal
+        Print byte arrays as decimal instead of hex
+            (incompatible with -6)
+
+    -f, --full
+        Don't truncate byte arrays in summaries
+
+    -r, --raw
+        Don't infer types

@@ -1,0 +1,75 @@
+buildscript {
+	repositories {
+		mavenCentral()
+	}
+	dependencies {
+		classpath 'net.sf.proguard:proguard-gradle:6.0.3'
+	}
+}
+
+plugins {
+	id 'net.minecrell.licenser' version '0.4.1'
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+archivesBaseName = 'unbted'
+version = '1.0'
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	compile('com.google.guava:guava:26.0-jre') {
+		transitive = false
+	}
+	compile 'com.google.code.gson:gson:2.8.5'
+	compile 'net.sf.jopt-simple:jopt-simple:6.0-alpha-2'
+	compile 'org.jline:jline-terminal:3.9.0'
+	compile 'org.jline:jline-terminal-jansi:3.9.0'
+	compile 'org.jline:jline-reader:3.9.0'
+	compile 'org.jline:jline-builtins:3.9.0'
+}
+
+task proguard(type: proguard.gradle.ProGuardTask) {
+	dependsOn compileJava
+	injars project.configurations.compile.plus(sourceSets.main.output)
+	libraryjars files(System.properties["java.home"]+"/lib/rt.jar", System.properties["java.home"]+"/lib/jce.jar")
+	outjars 'build/tmp/proguard.jar'
+	
+	dontoptimize
+	dontobfuscate
+	
+	keep 'class com.unascribed.nbted.** { *; }'
+	keepclassmembers 'class ** { *; }'
+	
+	dontwarn 'org.checkerframework.**'
+	dontwarn 'com.google.errorprone.**'
+	dontwarn 'com.google.j2objc.**'
+	dontwarn 'javax.annotation.**'
+	dontwarn 'org.codehaus.mojo.animal_sniffer.**'
+	dontwarn 'org.mozilla.universalchardet.**'
+	
+	verbose
+}
+
+jar {
+	manifest {
+		attributes (
+			'Main-Class': 'com.unascribed.nbted.NBTEd'
+		)
+	}
+	from(zipTree('build/tmp/proguard.jar'))
+	exclude 'META-INF/**'
+}
+
+license {
+	header = file('HEADER')
+	matching('**/io/github/steveice10/opennbt/**') {
+		header = file('opennbt-LICENSE')
+	}
+}
+
+tasks.jar.dependsOn proguard
