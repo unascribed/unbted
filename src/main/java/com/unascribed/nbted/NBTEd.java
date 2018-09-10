@@ -182,6 +182,7 @@ public class NBTEd {
 				if (e.getMessage() != null) {
 					System.err.println("    "+e.getMessage());
 				}
+				System.err.println("(run with --verbose for more information)");
 			}
 		};
 		Thread.setDefaultUncaughtExceptionHandler(ueh);
@@ -311,7 +312,7 @@ public class NBTEd {
 			log("Compression set as {}", c);
 		}
 		is = c.wrap(is);
-		Tag tag = is == null ? null : NBTIO.readTag(is);
+		Tag tag = is == null ? null : NBTIO.readTag(is, set.has("little"));
 		if (!set.has("no-print")) {
 			printTag(tag, "");
 		}
