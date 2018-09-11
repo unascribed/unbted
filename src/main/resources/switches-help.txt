@@ -11,50 +11,53 @@ or UUID long pairs. Type names prefixed with a ! indicate nonstandard
 OpenNBT extensions.
 
 Valid options:
-    -?, -h, --help
-        Print this help
+	-?, -h, --help
+		Print this help
 
-    -c=<method>, --compression=<method>
-        Assume the given compression method, rather than autodetecting
-        Valid methods are None, Deflate, and GZip
+	-c=<method>, --compression=<method>
+		Assume the given compression method, rather than autodetecting
+		Valid methods are None, Deflate, and GZip
 
-    -d, -v, --debug, --verbose
-        Print more information and stacktraces
+	-d, -v, --debug, --verbose
+		Print more information and stacktraces
 
-    -e, --extended
-        Enable OpenNBT extensions
-            (incompatible with -o)
+	-x, --extended
+		Enable OpenNBT extensions
+			(incompatible with -o)
 
-    -o, --old
-        Disable newer additions to the NBT format, such as int arrays
-            (incompatible with -e)
+	-o, --old
+		Disable newer additions to the NBT format, such as int arrays
+			(incompatible with -e)
 
-    -p, --print
-        Exit after printing file contents
-            (incompatible with -n)
+	-p, --print
+		Exit after printing file contents
+			(incompatible with -n)
 
-    -n, --no-print
-        Don't print out initial file contents, just edit
-            (incompatible with -p)
+	-n, --no-print
+		Don't print out initial file contents, just edit
+			(incompatible with -p)
 
-    -l, --little
-        Assume the input is a malformed little-endian NBT file
+	-l, --little
+		Assume the input is a malformed little-endian NBT file
 
-    -s, -j, --strict, --json
-        Print out well-formed JSON instead of a human-readable JSON-like
-        colored format
-            (implies -f and -6)
+	-s, -j, --strict, --json
+		Print out well-formed JSON instead of a human-readable JSON-like
+		colored format
+			(implies -f and -6)
 
-    -6, --base64
-        Print byte arrays as Base64 instead of hex
-            (incompatible with -d)
+	-6, --base64
+		Print byte arrays as Base64 instead of hex
+			(incompatible with -d)
 
-    -d, --decimal
-        Print byte arrays as decimal instead of hex
-            (incompatible with -6)
+	-d, --decimal
+		Print byte arrays as decimal instead of hex
+			(incompatible with -6)
 
-    -f, --full
-        Don't truncate byte arrays in summaries
+	-f, --full
+		Don't truncate byte arrays in summaries
 
-    -r, --raw
-        Don't infer types
+	-r, --raw
+		Don't infer types
+
+	--no-pager
+		Disable use of the embedded less-like pager

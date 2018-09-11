@@ -28,10 +28,12 @@ public class Command {
 	}
 	
 	public final Exec exec;
+	public final String description;
 	public final ImmutableList<String> names;
 
-	public Command(Exec exec, String... names) {
+	public Command(Exec exec, String description, String... names) {
 		this.exec = exec;
+		this.description = description;
 		this.names = ImmutableList.copyOf(names);
 	}
 

@@ -49,106 +49,106 @@ import io.github.steveice10.opennbt.tag.builtin.custom.StringArrayTag;
  * A registry containing different tag classes.
  */
 public class TagRegistry {
-    private static final Map<Integer, Class<? extends Tag>> idToTag = new HashMap<>();
-    private static final Map<Class<? extends Tag>, Integer> tagToId = new HashMap<>();
-    
-    public static boolean NEWTAGS_ENABLED = true;
-    public static boolean EXTENSIONS_ENABLED = false;
+	private static final Map<Integer, Class<? extends Tag>> idToTag = new HashMap<>();
+	private static final Map<Class<? extends Tag>, Integer> tagToId = new HashMap<>();
+	
+	public static boolean NEWTAGS_ENABLED = true;
+	public static boolean EXTENSIONS_ENABLED = false;
 
-    static {
-        register(1, ByteTag.class);
-        register(2, ShortTag.class);
-        register(3, IntTag.class);
-        register(4, LongTag.class);
-        register(5, FloatTag.class);
-        register(6, DoubleTag.class);
-        register(7, ByteArrayTag.class);
-        register(8, StringTag.class);
-        register(9, ListTag.class);
-        register(10, CompoundTag.class);
-        register(11, IntArrayTag.class);
-        register(12, LongArrayTag.class);
+	static {
+		register(1, ByteTag.class);
+		register(2, ShortTag.class);
+		register(3, IntTag.class);
+		register(4, LongTag.class);
+		register(5, FloatTag.class);
+		register(6, DoubleTag.class);
+		register(7, ByteArrayTag.class);
+		register(8, StringTag.class);
+		register(9, ListTag.class);
+		register(10, CompoundTag.class);
+		register(11, IntArrayTag.class);
+		register(12, LongArrayTag.class);
 
-        register(60, DoubleArrayTag.class);
-        register(61, FloatArrayTag.class);
-        register(65, ShortArrayTag.class);
-        register(66, StringArrayTag.class);
-    }
+		register(60, DoubleArrayTag.class);
+		register(61, FloatArrayTag.class);
+		register(65, ShortArrayTag.class);
+		register(66, StringArrayTag.class);
+	}
 
-    /**
-     * Registers a tag class.
-     *
-     * @param id  ID of the tag.
-     * @param tag Tag class to register.
-     * @throws TagRegisterException If an error occurs while registering the tag.
-     */
-    public static void register(int id, Class<? extends Tag> tag) {
-        if(idToTag.containsKey(id)) {
-            throw new IllegalArgumentException("Tag ID \"" + id + "\" is already in use.");
-        }
+	/**
+	 * Registers a tag class.
+	 *
+	 * @param id  ID of the tag.
+	 * @param tag Tag class to register.
+	 * @throws TagRegisterException If an error occurs while registering the tag.
+	 */
+	public static void register(int id, Class<? extends Tag> tag) {
+		if(idToTag.containsKey(id)) {
+			throw new IllegalArgumentException("Tag ID \"" + id + "\" is already in use.");
+		}
 
-        if(tagToId.containsKey(tag)) {
-            throw new IllegalArgumentException("Tag \"" + tag.getSimpleName() + "\" is already registered.");
-        }
+		if(tagToId.containsKey(tag)) {
+			throw new IllegalArgumentException("Tag \"" + tag.getSimpleName() + "\" is already registered.");
+		}
 
-        idToTag.put(id, tag);
-        tagToId.put(tag, id);
-    }
+		idToTag.put(id, tag);
+		tagToId.put(tag, id);
+	}
 
-    /**
-     * Gets the tag class with the given id.
-     *
-     * @param id Id of the tag.
-     * @return The tag class with the given id, or null if it cannot be found.
-     */
-    public static Class<? extends Tag> getClassFor(int id) {
-    	if (id >= 60 && !EXTENSIONS_ENABLED) return null;
-    	// replace old OpenNBT extended long[] with new vanilla long[]
-    	if (EXTENSIONS_ENABLED && id == 62) id = 12;
-    	if (id == 11 || id == 12 && !NEWTAGS_ENABLED) return null;
-        if(!idToTag.containsKey(id)) {
-            return null;
-        }
+	/**
+	 * Gets the tag class with the given id.
+	 *
+	 * @param id Id of the tag.
+	 * @return The tag class with the given id, or null if it cannot be found.
+	 */
+	public static Class<? extends Tag> getClassFor(int id) {
+		if (id >= 60 && !EXTENSIONS_ENABLED) return null;
+		// replace old OpenNBT extended long[] with new vanilla long[]
+		if (EXTENSIONS_ENABLED && id == 62) id = 12;
+		if (id == 11 || id == 12 && !NEWTAGS_ENABLED) return null;
+		if(!idToTag.containsKey(id)) {
+			return null;
+		}
 
-        return idToTag.get(id);
-    }
+		return idToTag.get(id);
+	}
 
-    /**
-     * Gets the id of the given tag class.
-     *
-     * @param clazz The tag class to get the id of.
-     * @return The id of the given tag class, or -1 if it cannot be found.
-     */
-    public static int getIdFor(Class<? extends Tag> clazz) {
-    	if (Extension.class.isAssignableFrom(clazz) && !EXTENSIONS_ENABLED) return -1;
-    	if ((clazz == IntArrayTag.class || clazz == LongArrayTag.class) && !NEWTAGS_ENABLED) return -1;
-        if(!tagToId.containsKey(clazz)) {
-            return -1;
-        }
+	/**
+	 * Gets the id of the given tag class.
+	 *
+	 * @param clazz The tag class to get the id of.
+	 * @return The id of the given tag class, or -1 if it cannot be found.
+	 */
+	public static int getIdFor(Class<? extends Tag> clazz) {
+		if (Extension.class.isAssignableFrom(clazz) && !EXTENSIONS_ENABLED) return -1;
+		if ((clazz == IntArrayTag.class || clazz == LongArrayTag.class) && !NEWTAGS_ENABLED) return -1;
+		if(!tagToId.containsKey(clazz)) {
+			return -1;
+		}
 
-        return tagToId.get(clazz);
-    }
+		return tagToId.get(clazz);
+	}
 
-    /**
-     * Creates an instance of the tag with the given id, using the String constructor.
-     *
-     * @param id      Id of the tag.
-     * @param tagName Name to give the tag.
-     * @return The created tag.
-     * @throws TagCreateException If an error occurs while creating the tag.
-     */
-    public static Tag createInstance(int id, String tagName) {
-        Class<? extends Tag> clazz = idToTag.get(id);
-        if(clazz == null) {
-            throw new IllegalArgumentException("Could not find tag with ID \"" + id + "\".");
-        }
+	/**
+	 * Creates an instance of the tag with the given id, using the String constructor.
+	 *
+	 * @param id	  Id of the tag.
+	 * @param tagName Name to give the tag.
+	 * @return The created tag.
+	 * @throws TagCreateException If an error occurs while creating the tag.
+	 */
+	public static Tag createInstance(int id, String tagName, Tag parent) {
+		Class<? extends Tag> clazz = idToTag.get(id);
+		if(clazz == null) {
+			throw new IllegalArgumentException("Could not find tag with ID \"" + id + "\".");
+		}
 
-        try {
-            Constructor<? extends Tag> constructor = clazz.getDeclaredConstructor(String.class);
-            constructor.setAccessible(true);
-            return constructor.newInstance(tagName);
-        } catch(Exception e) {
-            throw new RuntimeException("Failed to create instance of tag \"" + clazz.getSimpleName() + "\".", e);
-        }
-    }
+		try {
+			Constructor<? extends Tag> constructor = clazz.getDeclaredConstructor(String.class, Tag.class);
+			constructor.setAccessible(true);
+			return constructor.newInstance(tagName, parent);
+		} catch(Exception e) {
+			throw new RuntimeException("Failed to create instance of tag \"" + clazz.getSimpleName() + "\".", e);
+		}
+	}
 }

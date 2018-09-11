@@ -1,0 +1,39 @@
+Una's NBT Editor
+
+Type names prefixed with a ~ indicate inferred types, such as JSON strings
+or UUID long pairs. Type names prefixed with a ! indicate nonstandard
+OpenNBT extensions.
+
+?, help
+	Display this help
+
+copying
+	Display the text of the GNU General Public License version 3
+
+warranty
+	Display the warranty sections of the GNU General Public License
+	version 3
+
+cd
+	Change the command context to the given named compound child of the
+	current compound, similar to a change-directory command in a
+	filesystem. Multiple levels can be traversed by separating compound
+	names with a forward slash. With no arguments, jumps to the root of
+	the file.
+
+dir, ls
+	Print out the contents of the current command context, or a child
+	specified by a path like one that would be given to cd. By default,
+	only prints immediate children.
+	Switches:
+	-R, --recursive
+		Print all descendants recursively, instead of only immediate
+		children.
+	-d, --directory
+		Print the compound itself, rather than its children.
+		Overshadows -R.
+	-r, --raw
+		Don't infer types
+	-l, -1, -a, -A
+		Ignored. Support may be added in the future. Ignored in the
+		mean time to prevent muscle memory mistakes.

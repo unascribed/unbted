@@ -55,6 +55,21 @@ task proguard(type: proguard.gradle.ProGuardTask) {
 	verbose
 }
 
+task fatJar(type: Jar) {
+	dependsOn compileJava
+	manifest {
+		attributes (
+			'Main-Class': 'com.unascribed.nbted.NBTEd'
+		)
+	}
+	classifier 'fat'
+	project.configurations.compile.resolve().each {
+		from(zipTree(it))
+		exclude 'META-INF/**'
+	}
+	from(sourceSets.main.output)
+}
+
 jar {
 	manifest {
 		attributes (
