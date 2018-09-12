@@ -4,7 +4,7 @@ Type names prefixed with a ~ indicate inferred types, such as JSON strings
 or UUID long pairs. Type names prefixed with a ! indicate nonstandard
 OpenNBT extensions.
 
-?, help
+help, h, ?
 	Display this help
 
 copying
@@ -21,7 +21,7 @@ cd
 	names with a forward slash. With no arguments, jumps to the root of
 	the file.
 
-dir, ls
+ls, dir
 	Print out the contents of the current command context, or a child
 	specified by a path like one that would be given to cd. By default,
 	only prints immediate children.
@@ -37,3 +37,6 @@ dir, ls
 	-l, -1, -a, -A
 		Ignored. Support may be added in the future. Ignored in the
 		mean time to prevent muscle memory mistakes.
+
+rem, remark, comment, #, //
+	Do nothing, ignore all arguments.

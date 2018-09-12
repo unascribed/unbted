@@ -29,6 +29,7 @@ import org.jline.reader.Completer;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.Highlighter;
 import org.jline.reader.LineReader;
+import org.jline.reader.LineReader.Option;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.UserInterruptException;
@@ -120,6 +121,9 @@ public class CommandProcessor implements Completer, Highlighter {
 				NBTEd.displayEmbeddedFileInPager("commands-help.txt");
 			}));
 		addCommand(Command.create()
+			.name("rem").aliases("comment", "remark", "#", "//")
+			.description("do nothing"));
+		addCommand(Command.create()
 			.name("cd")
 			.description("change command context")
 			.completer(dirCompleter)
@@ -133,7 +137,7 @@ public class CommandProcessor implements Completer, Highlighter {
 			}));
 		addCommand(Command.create()
 			.name("ls").aliases("dir")
-			.description("change command context")
+			.description("list compound contents")
 			.completer(dirCompleter)
 			.options((parser) -> {
 				parser.acceptsAll(Arrays.asList("R", "recursive"));
@@ -212,10 +216,11 @@ public class CommandProcessor implements Completer, Highlighter {
 				.terminal(NBTEd.terminal)
 				.highlighter(this)
 				.variable(LineReader.HISTORY_FILE, System.getProperty("user.home")+"/.unbted_history")
+				.option(Option.CASE_INSENSITIVE, true)
+				.variable(LineReader.COMMENT_BEGIN, "#")
 				.build();
 		while (true) {
 			try {
-				System.err.println();
 				r.readLine("["+getPath()+"]> ");
 				ParsedLine parsed = r.getParsedLine();
 				List<String> words = parsed.words();
@@ -267,10 +272,8 @@ public class CommandProcessor implements Completer, Highlighter {
 	@Override
 	public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
 		if (line.wordIndex() == 0) {
-			for (Command c : commands.values()) {
-				for (String s : c.getAllNames()) {
-					candidates.add(new Candidate(s, s, null, c.getDescription(), null, c.getName(), true));
-				}
+			for (Map.Entry<String, Command> en : commands.entrySet()) {
+				candidates.add(new Candidate(en.getKey(), en.getKey(), null, en.getValue().getDescription(), null, en.getValue().getName(), true));
 			}
 		} else if (line.words().size() > 1) {
 			List<String> words = line.words();
@@ -288,22 +291,27 @@ public class CommandProcessor implements Completer, Highlighter {
 	public AttributedString highlight(LineReader reader, String buffer) {
 		AttributedStringBuilder asb = new AttributedStringBuilder(buffer.length());
 		ParsedLine parsed = reader.getParser().parse(buffer, buffer.length(), ParseContext.COMPLETE);
-		String command;
+		String commandStr;
 		if (!parsed.words().isEmpty()) {
-			command = parsed.words().get(0);
+			commandStr = parsed.words().get(0);
 		} else {
-			command = buffer;
+			commandStr = buffer;
 		}
-		boolean valid = commands.containsKey(command);
+		Command command = commands.get(commandStr);
 		AttributedStyle commandStyle = new AttributedStyle();
-		if (valid) {
-			commandStyle = commandStyle.foreground(AttributedStyle.BLUE);
+		if (command != null) {
+			if ("rem".equals(command.getName())) {
+				asb.append(buffer, new AttributedStyle().foreground(AttributedStyle.RED));
+				return asb.toAttributedString();
+			} else {
+				commandStyle = commandStyle.foreground(AttributedStyle.BLUE);
+			}
 		} else {
 			commandStyle = commandStyle.foreground(AttributedStyle.RED).bold();
 		}
-		asb.append(command, commandStyle);
+		asb.append(commandStr, commandStyle);
 		AttributedStyle basicStyle = new AttributedStyle().foreground(AttributedStyle.BLUE).bold();
-		Matcher matcher = HIGHLIGHTED.matcher(buffer.substring(command.length()));
+		Matcher matcher = HIGHLIGHTED.matcher(buffer.substring(commandStr.length()));
 		StringBuffer scratch = new StringBuffer();
 		while (matcher.find()) {
 			AttributedStyle stringStyle = new AttributedStyle();

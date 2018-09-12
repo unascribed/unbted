@@ -53,10 +53,12 @@ public class Command {
 	private Command() {}
 	
 	public void execute(Iterable<String> args) throws Exception {
+		if (action == null) return;
 		execute(Iterables.toArray(args, String.class));
 	}
 	
 	public void execute(String... args) throws Exception {
+		if (action == null) return;
 		OptionParser parser = new OptionParser();
 		setupOptionParser(parser);
 		OptionSet set = parser.parse(args);
@@ -64,6 +66,7 @@ public class Command {
 	}
 	
 	public void execute(OptionSet set) throws Exception {
+		if (action == null) return;
 		action.run(set, (List<String>)set.nonOptionArguments());
 	}
 	
