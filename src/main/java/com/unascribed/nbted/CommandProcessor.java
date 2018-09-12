@@ -282,7 +282,7 @@ public class CommandProcessor implements Completer, Highlighter {
 		}
 	}
 
-	private static final Pattern HIGHLIGHTED = Pattern.compile("((?:[^\\\\]|^)[\"'](?:.*?[^\\\\]|)([\\\"']|$)|\\\\.)");
+	private static final Pattern HIGHLIGHTED = Pattern.compile("([^\\\\]|^)([\"'](?:.*?[^\\\\]|)([\\\"']|$)|\\\\.)");
 	
 	@Override
 	public AttributedString highlight(LineReader reader, String buffer) {
@@ -307,15 +307,15 @@ public class CommandProcessor implements Completer, Highlighter {
 		StringBuffer scratch = new StringBuffer();
 		while (matcher.find()) {
 			AttributedStyle stringStyle = new AttributedStyle();
-			if (matcher.group(2) == null) {
+			if (matcher.group(3) == null) {
 				stringStyle = stringStyle.foreground(AttributedStyle.CYAN);
-			} else if (matcher.group(2).isEmpty()) {
+			} else if (matcher.group(3).isEmpty()) {
 				stringStyle = stringStyle.foreground(AttributedStyle.RED).bold();
 			} else {
 				stringStyle = stringStyle.foreground(AttributedStyle.YELLOW);
 			}
 			scratch.setLength(0);
-			matcher.appendReplacement(scratch, "\0$0\0");
+			matcher.appendReplacement(scratch, "$1\0$2\0");
 			String head = scratch.substring(0, scratch.indexOf("\0"));
 			String body = scratch.substring(scratch.indexOf("\0")+1, scratch.lastIndexOf("\0"));
 			String tail = scratch.substring(scratch.lastIndexOf("\0")+1);
