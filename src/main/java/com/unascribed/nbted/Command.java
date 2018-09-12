@@ -18,23 +18,120 @@
 
 package com.unascribed.nbted;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.LineReader;
+import org.jline.reader.ParsedLine;
+
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 public class Command {
-
-	public interface Exec {
-		void exec(List<String> arguments) throws Exception;
+	public interface Action {
+		void run(OptionSet set, List<String> args) throws Exception;
+	}
+	public interface Options {
+		void setup(OptionParser parser) throws Exception;
 	}
 	
-	public final Exec exec;
-	public final String description;
-	public final ImmutableList<String> names;
-
-	public Command(Exec exec, String description, String... names) {
-		this.exec = exec;
+	private Action action;
+	private Completer completer;
+	private Options options;
+	private String description = "";
+	private String name = "";
+	private ImmutableList<String> aliases = ImmutableList.of();
+	private ImmutableSet<String> allNames = ImmutableSet.of();
+	
+	private Command() {}
+	
+	public void execute(Iterable<String> args) throws Exception {
+		execute(Iterables.toArray(args, String.class));
+	}
+	
+	public void execute(String... args) throws Exception {
+		OptionParser parser = new OptionParser();
+		setupOptionParser(parser);
+		OptionSet set = parser.parse(args);
+		execute(set);
+	}
+	
+	public void execute(OptionSet set) throws Exception {
+		action.run(set, (List<String>)set.nonOptionArguments());
+	}
+	
+	public void setupOptionParser(OptionParser parser) throws Exception {
+		if (options != null) {
+			options.setup(parser);
+		}
+	}
+	
+	public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
+		if (completer != null) {
+			completer.complete(reader, line, candidates);
+		}
+	}
+	
+	public String getDescription() {
+		return description;
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public ImmutableList<String> getAliases() {
+		return aliases;
+	}
+	
+	public ImmutableSet<String> getAllNames() {
+		return allNames;
+	}
+	
+	
+	
+	public Command action(Action action) {
+		this.action = action;
+		return this;
+	}
+	
+	public Command completer(Completer completer) {
+		this.completer = completer;
+		return this;
+	}
+	
+	public Command options(Options options) {
+		this.options = options;
+		return this;
+	}
+	
+	public Command description(String description) {
 		this.description = description;
-		this.names = ImmutableList.copyOf(names);
+		return this;
+	}
+	
+	public Command name(String name) {
+		this.name = name;
+		this.allNames = ImmutableSet.copyOf(Iterables.concat(Collections.singleton(name), aliases));
+		return this;
+	}
+	
+	public Command aliases(String... aliases) {
+		this.aliases = ImmutableList.copyOf(aliases);
+		this.allNames = ImmutableSet.copyOf(Iterables.concat(Collections.singleton(name), Arrays.asList(aliases)));
+		return this;
+	}
+	
+	
+	public static Command create() {
+		return new Command();
 	}
 
 }
