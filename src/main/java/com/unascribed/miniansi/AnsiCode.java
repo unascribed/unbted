@@ -73,8 +73,10 @@ public enum AnsiCode implements Ansi {
 	RESET(0),
 	;
 	private final ImmutableList<Integer> codes;
+	private final String alone;
 	AnsiCode(Integer... codes) {
 		this.codes = ImmutableList.copyOf(codes);
+		this.alone = Ansi.Utils.toString(this);
 	}
 	@Override
 	public ImmutableList<Integer> getCodes() {
@@ -82,6 +84,6 @@ public enum AnsiCode implements Ansi {
 	}
 	@Override
 	public String toString() {
-		return Ansi.Utils.toString(this);
+		return alone;
 	}
 }

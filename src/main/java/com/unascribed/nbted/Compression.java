@@ -20,7 +20,10 @@ package com.unascribed.nbted;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
 public enum Compression {
@@ -31,12 +34,23 @@ public enum Compression {
 	private Compression(String name) {
 		this.name = name;
 	}
+	
 	public InputStream wrap(InputStream is) throws IOException {
 		if (is == null) return null;
 		switch (this) {
 			case NONE: return is;
 			case DEFLATE: return new InflaterInputStream(is);
 			case GZIP: return new GZIPInputStream(is);
+			default: throw new AssertionError("missing case for "+this);
+		}
+	}
+	
+	public OutputStream wrap(OutputStream os) throws IOException {
+		if (os == null) return null;
+		switch (this) {
+			case NONE: return os;
+			case DEFLATE: return new DeflaterOutputStream(os);
+			case GZIP: return new GZIPOutputStream(os);
 			default: throw new AssertionError("missing case for "+this);
 		}
 	}

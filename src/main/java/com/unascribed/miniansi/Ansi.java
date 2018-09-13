@@ -19,8 +19,8 @@
 package com.unascribed.miniansi;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
 public interface Ansi {
@@ -37,7 +37,7 @@ public interface Ansi {
 			try {
 				toAppendable(a, codes);
 			} catch (IOException e) {
-				Throwables.propagate(e);
+				throw new UncheckedIOException(e);
 			}
 		}
 	

@@ -33,7 +33,6 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
@@ -43,6 +42,8 @@ import org.jline.builtins.Less;
 import org.jline.builtins.Source.URLSource;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
+
+import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.Resources;
@@ -65,10 +66,19 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import joptsimple.ValueConverter;
 
 public class NBTEd {
-	public static boolean VERBOSE = false;
+	public static final String VERSION;
+	static {
+		String ver = null;
+		try {
+			ver = Resources.toString(ClassLoader.getSystemResource("version.txt"), Charsets.UTF_8);
+		} catch (Exception e) {
+		}
+		VERSION = ver == null ? "?.?" : ver;
+	}
+	
+	public static boolean VERBOSE = true;
 	public static boolean JSON = false;
 	public static boolean TRUNCATE = true;
 	public static boolean DECIMAL_BYTES = false;
@@ -92,7 +102,19 @@ public class NBTEd {
 	
 	public static void log(String msg, Object... args) {
 		if (VERBOSE) {
-			System.err.println(fmt.format(new Date())+" "+String.format(msg.replace("%", "%%").replace("{}", "%s"), args));
+			Throwable t = null;
+			if (args.length > 0 && args[args.length-1] instanceof Throwable) {
+				t = (Throwable)args[args.length-1];
+				args = Arrays.copyOfRange(args, 0, args.length-1);
+			}
+			System.err.print("unbted: ");
+			System.err.print(fmt.format(new Date()));
+			System.err.print(" ");
+			System.err.printf(msg.replace("%", "%%").replace("{}", "%s"), args);
+			System.err.println();
+			if (t != null) {
+				t.printStackTrace();
+			}
 		}
 	}
 	
@@ -106,7 +128,7 @@ public class NBTEd {
 		UncaughtExceptionHandler ueh = (t, e) -> {
 			if (VERBOSE) {
 				e.printStackTrace();
-			} else {
+			} else if ("main".equals(t.getName())) {
 				String str = "";
 				for (Map.Entry<Class<? extends Throwable>, String> en : commonExceptions.entrySet()) {
 					if (en.getKey().isAssignableFrom(e.getClass())) {
@@ -114,41 +136,30 @@ public class NBTEd {
 						break;
 					}
 				}
-				System.err.println("An unexpected "+str+"error occurred"+(e.getMessage() == null ? "." : ":"));
+				System.err.println("unbted: An unexpected "+str+"error occurred"+(e.getMessage() == null ? "." : ":"));
 				if (e.getMessage() != null) {
-					System.err.println("    "+e.getMessage());
+					System.err.println("unbted:     "+e.getMessage());
 				}
-				System.err.println("(run with --verbose for more information)");
+				System.err.println("unbted: (run with --verbose for more information)");
+				System.exit(3);
 			}
 		};
 		Thread.setDefaultUncaughtExceptionHandler(ueh);
 		Thread.currentThread().setUncaughtExceptionHandler(ueh);
 		OptionParser parser = new OptionParser();
-		parser.acceptsAll(Arrays.asList("help", "h", "?")).forHelp();
+		parser.acceptsAll(Arrays.asList("help", "h")).forHelp();
 		parser.mutuallyExclusive(
 			parser.acceptsAll(Arrays.asList("extended", "x")),
 			parser.acceptsAll(Arrays.asList("old", "o"))
 		);
-		parser.acceptsAll(Arrays.asList("little", "le", "l"));
-		OptionSpec<Compression> compression = parser.acceptsAll(Arrays.asList("compression", "c")).withRequiredArg().ofType(Compression.class)
-				.withValuesConvertedBy(new ValueConverter<Compression>() {
-
-					@Override
-					public Compression convert(String value) {
-						return Compression.valueOf(value.toUpperCase(Locale.ROOT));
-					}
-
-					@Override
-					public Class<? extends Compression> valueType() {
-						return Compression.class;
-					}
-
-					@Override
-					public String valuePattern() {
-						return "";
-					}
-					
-				});
+		OptionSpec<Endianness> endiannessOpt = parser.accepts("endian").withRequiredArg().ofType(Endianness.class)
+				.withValuesConvertedBy(new CaseInsensitiveEnumConverter<>(Endianness.class));
+		parser.mutuallyExclusive(
+			parser.accepts("little-endian").availableUnless("endian"),
+			parser.accepts("big-endian").availableUnless("endian")
+		);
+		OptionSpec<Compression> compressionOpt = parser.acceptsAll(Arrays.asList("compression", "c")).withRequiredArg().ofType(Compression.class)
+				.withValuesConvertedBy(new CaseInsensitiveEnumConverter<>(Compression.class));
 		parser.acceptsAll(Arrays.asList("debug", "verbose", "d", "v"));
 		parser.mutuallyExclusive(
 			parser.acceptsAll(Arrays.asList("print", "p")),
@@ -174,9 +185,8 @@ public class NBTEd {
 			System.exit(1);
 			return;
 		}
-		if (set.has("verbose")) {
-			VERBOSE = true;
-		} else {
+		if (!set.has("verbose")) {
+			VERBOSE = false;
 			Logger root = Logger.getLogger("");
 			for (Handler h : root.getHandlers()) {
 				root.removeHandler(h);
@@ -201,16 +211,20 @@ public class NBTEd {
 			return;
 		}
 		String in = set.valueOf(nonoption);
+		File sourceFile;
 		InputStream is;
 		if (in == null || in.isEmpty()) {
+			sourceFile = null;
 			is = null;
 		} else { 
 			if ("-".equals(in)) {
 				is = System.in;
+				sourceFile = FileInfo.STDIN;
 				log("Reading from stdin");
 			} else {
 				File f = new File(in);
 				is = new FileInputStream(f);
+				sourceFile = f;
 				log("Reading from file {}", f);
 			}
 			is = new BufferedInputStream(is);
@@ -240,30 +254,97 @@ public class NBTEd {
 		if (set.has("raw")) {
 			INFER = false;
 		}
-		Compression c = set.valueOf(compression);
-		if (c == null) {
-			if (is != null) {
-				is.mark(2);
-				int magic8 = is.read() & 0xff;
-				int magic16 = magic8 | ((is.read() << 8) & 0xff00);
-				is.reset();
-				if (magic16 == GZIPInputStream.GZIP_MAGIC) {
-					c = Compression.GZIP;
-				} else if (magic8 == 0x78) {
-					c = Compression.DEFLATE;
-				} else {
-					c = Compression.NONE;
-				}
-				log("Compression autodetected as {}", c);
+		Compression compressionMethod = set.valueOf(compressionOpt);
+		Compression detectedCompressionMethod = null;
+		if (is != null) {
+			is.mark(2);
+			int magic8 = is.read() & 0xff;
+			int magic16 = magic8 | ((is.read() << 8) & 0xff00);
+			is.reset();
+			if (magic16 == GZIPInputStream.GZIP_MAGIC) {
+				detectedCompressionMethod = Compression.GZIP;
+			} else if (magic8 == 0x78) {
+				detectedCompressionMethod = Compression.DEFLATE;
 			} else {
-				log("No compression specified for new buffer, defaulting to GZip");
-				c = Compression.GZIP;
+				detectedCompressionMethod = Compression.NONE;
+			}
+			log("Compression autodetected as {}", detectedCompressionMethod);
+		}
+		boolean compressionAutodetected;
+		if (compressionMethod == null) {
+			if (is != null) {
+				compressionMethod = detectedCompressionMethod;
+				log("Using autodetected compression method");
+				compressionAutodetected = true;
+			} else {
+				log("No compression specified for new buffer");
+				compressionMethod = null;
+				compressionAutodetected = false;
 			}
 		} else {
-			log("Compression set as {}", c);
+			log("Compression set as {}", compressionMethod);
+			compressionAutodetected = false;
 		}
-		is = c.wrap(is);
-		Tag tag = is == null ? null : NBTIO.readTag(is, set.has("little"), null);
+		Endianness endianness = null;
+		if (set.has(endiannessOpt)) {
+			endianness = set.valueOf(endiannessOpt);
+		} else if (set.has("little-endian")) {
+			endianness = Endianness.LITTLE;
+		} else if (set.has("big-endian")) {
+			endianness = Endianness.BIG;
+		}
+		Tag tag = null;
+		if (is != null) {
+			try {
+				is = compressionMethod == null ? is : compressionMethod.wrap(is);
+				if (endianness != null) {
+					tag = NBTIO.readTag(endianness.wrap(is), null);
+				} else {
+					try {
+						tag = NBTIO.readTag(is, false, null);
+						if (tag == null) throw new RuntimeException("Got null root tag");
+						endianness = Endianness.BIG;
+						log("Endianness autodetected as big-endian");
+					} catch (Exception e) {
+						try {
+							tag = NBTIO.readTag(is, true, null);
+							if (tag == null) throw new RuntimeException("Got null root tag");
+							endianness = Endianness.LITTLE;
+							log("Endianness autodetected as little-endian");
+						} catch (Exception e2) {
+							e2.addSuppressed(e);
+							throw e2;
+						}
+					}
+				}
+				if (tag == null) throw new RuntimeException("Got null root tag");
+			} catch (Exception e) {
+				log("Exception while trying to load NBT file", e);
+				System.err.println("unbted: Failed to load "+(sourceFile == FileInfo.STDIN ? "(stdin)" : sourceFile.getAbsolutePath()));
+				if (!compressionAutodetected) {
+					System.err.println("unbted: Are you sure "+compressionMethod+" is the correct compression method?");
+					if (detectedCompressionMethod != null && detectedCompressionMethod != compressionMethod) {
+						System.err.println("unbted: It looks like "+detectedCompressionMethod+" to me");
+					}
+				} else {
+					System.err.print("unbted: Are you sure this is an NBT file?");
+					if (endianness != null) {
+						if (endianness == Endianness.ZZAZZ) {
+							System.err.print(" (Maybe it's not in a joke format?)");
+						} else {
+							System.err.print(" (Maybe it's "); 
+							System.err.print(endianness == Endianness.LITTLE ? "big" : "little");
+							System.err.print("-endian?)");
+						}
+					}
+					System.err.println();
+				}
+				System.exit(2);
+				return;
+			}
+		} else {
+			endianness = Endianness.BIG;
+		}
 		TagPrinter printer = new TagPrinter(System.out, byteArrayFormatter);
 		if (!set.has("no-print")) {
 			if (JSON) {
@@ -279,14 +360,14 @@ public class NBTEd {
 			}
 		}
 		if (!set.has("print")) {
-			System.err.println("Una's NBT Editor v1.0");
+			System.err.println("Una's NBT Editor v"+VERSION);
 			System.err.println("Copyright (C) 2018 Una Thompson (unascribed)");
 			System.err.println("This program comes with ABSOLUTELY NO WARRANTY; for details type `warranty`."); 
 			System.err.println("This is free software, and you are welcome to redistribute it under certain");
 			System.err.println("conditions; type `copying` for details.");
 			System.err.println();
 			System.err.println("Type `help` for help");
-			CommandProcessor cp = new CommandProcessor(tag, printer);
+			CommandProcessor cp = new CommandProcessor(tag, printer, new FileInfo(sourceFile, compressionMethod, compressionAutodetected, endianness));
 			cp.run();
 		}
 	}

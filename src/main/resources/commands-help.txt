@@ -1,20 +1,22 @@
 Una's NBT Editor
 
-Type names prefixed with a ~ indicate inferred types, such as JSON strings
-or UUID long pairs. Type names prefixed with a ! indicate nonstandard
-OpenNBT extensions.
+Type names prefixed with a ~ indicate inferred types, such as JSON
+strings or UUID long pairs. Type names prefixed with a ! indicate
+nonstandard OpenNBT extensions.
+
+Arguments in <angle brackets> represent required arguments.
+[Square brackets] indicate optional arguments. Arguments followed by
+"..." indicate the argument may be repeated.
+
+A yellow * will be displayed before the prompt if the file has been
+modified.
 
 help, h, ?
+	No arguments
 	Display this help
 
-copying
-	Display the text of the GNU General Public License version 3
-
-warranty
-	Display the warranty sections of the GNU General Public License
-	version 3
-
 cd
+	Arguments: <path>
 	Change the command context to the given named compound child of the
 	current compound, similar to a change-directory command in a
 	filesystem. Multiple levels can be traversed by separating compound
@@ -22,6 +24,7 @@ cd
 	the file.
 
 ls, dir
+	Arguments: [path]
 	Print out the contents of the current command context, or a child
 	specified by a path like one that would be given to cd. By default,
 	only prints immediate children.
@@ -33,10 +36,95 @@ ls, dir
 		Print the compound itself, rather than its children.
 		Overshadows -R.
 	-r, --raw
-		Don't infer types
-	-l, -1, -a, -A
-		Ignored. Support may be added in the future. Ignored in the
-		mean time to prevent muscle memory mistakes.
+		Don't infer types.
+	-l, --long
+		Print values.
+	-1, -a, -A
+		Ignored. Recognized to avoid mistakes from habit.
+
+rm, del, rmdir, rd
+	Arguments: <path>...
+	Delete the given tag(s). If a tag is a compound and is not empty,
+	print an error and do nothing.
+	Switches:
+	-r, --recursive
+		Also delete nonempty compounds.
+	-f, --force
+		Ignore errors and attempt to remove every item listed.
+
+exit, abort
+	No arguments.
+	Exit unbted, without saving changes. You will be asked to confirm
+	if there are unsaved changes.
+	Switches:
+	-f, --force
+		Don't ask to confirm when there are unsaved changes. Implied if
+		the command is invoked as abort.
+
+save
+	Arguments: [file]
+	Save changes to the given file, or the file that was originally
+	loaded. If a file was not loaded, the file argument is required.
+	This is true when loading from stdin or when creating a new empty
+	file.
+	Switches:
+		-c=<method>, --compression=<method>
+			Override the compression method used. Valid values are None,
+			Deflate, and GZip. GZip is the most common. Required on new
+			empty files. Otherwise, defaults to the compression that
+			was used when the file was loaded.
+		--endian=<endianness>, --little-endian, --big-endian
+			Write a <endianness>-endian file instead of the default.
+			See the program help for more information about why unbted
+			supports little-endian NBT.
+			Valid endiannesses are Big and Little. (case-insensitive)
+		-d, --default
+			Update the default file, compression method, and endianness
+			to those specified.
+
+info
+	No arguments.
+	Print information about the loaded file, such as its
+	compression algorithm, root tag name, total size, etc.
+	-s, --si
+		Use SI units (1000) instead of binary units (1024)
+
+echo
+	Arguments: [anything]...
+	Print arguments.
+	Switches:
+	-e
+		Parse escapes. The following escapes are recognized:
+			\\ backslash
+			\a alert (BEL)
+			\b backspace
+			\c produce no further output
+			\e escape
+			\f form feed
+			\n new line
+			\r carriage return
+			\t horizontal tab
+			\v vertical tab
+			\0NNN byte with octal value NNN (1 to 3 digits)
+			\xHH byte with hexadecimal value HH (1 to 2 digits)
+			\uHHHH UTF-16 character with hexadecimal value HHHH (1 to 4
+				digits)
+			\UHHHHHHHH UCS-4 character with hexadecimal value HHHHHHHH
+				(1 to 8 digits)
+	-s
+		Do not separate arguments with spaces.
+	-n
+		Do not emit a newline.
 
 rem, remark, comment, #, //
+	Arguments: [anything]...
 	Do nothing, ignore all arguments.
+
+copying
+	No arguments.
+	Display the text of the GNU General Public License version 3.
+
+warranty
+	No arguments.
+	Display the warranty sections of the GNU General Public License
+	version 3.

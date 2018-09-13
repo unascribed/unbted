@@ -251,7 +251,7 @@ public class NBTIO {
 		tag.write(out);
 	}
 
-	private static class LittleEndianDataInputStream extends FilterInputStream implements DataInput {
+	public static class LittleEndianDataInputStream extends FilterInputStream implements DataInput {
 		public LittleEndianDataInputStream(InputStream in) {
 			super(in);
 		}
@@ -415,7 +415,7 @@ public class NBTIO {
 		}
 	}
 
-	private static class LittleEndianDataOutputStream extends FilterOutputStream implements DataOutput {
+	public static class LittleEndianDataOutputStream extends FilterOutputStream implements DataOutput {
 		public LittleEndianDataOutputStream(OutputStream out) {
 			super(out);
 		}

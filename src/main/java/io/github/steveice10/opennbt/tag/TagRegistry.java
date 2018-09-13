@@ -104,8 +104,8 @@ public class TagRegistry {
 	public static Class<? extends Tag> getClassFor(int id) {
 		if (id >= 60 && !EXTENSIONS_ENABLED) return null;
 		// replace old OpenNBT extended long[] with new vanilla long[]
-		if (EXTENSIONS_ENABLED && id == 62) id = 12;
-		if (id == 11 || id == 12 && !NEWTAGS_ENABLED) return null;
+		if (id == 62) id = 12;
+		if ((id == 11 || id == 12) && !NEWTAGS_ENABLED) return null;
 		if(!idToTag.containsKey(id)) {
 			return null;
 		}

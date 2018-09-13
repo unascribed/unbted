@@ -155,7 +155,6 @@ public class AnsiStream extends PrintStream {
 	}
 
 	public void printPadded(String str, Ansi... codes) {
-		//noinspection ImplicitArrayToString
 		print(codes);
 		print(" ");
 		print(str);

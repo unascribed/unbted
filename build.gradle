@@ -15,7 +15,7 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 
 archivesBaseName = 'unbted'
-version = '1.0'
+version = file('version.txt').text.trim()
 
 repositories {
 	mavenCentral()

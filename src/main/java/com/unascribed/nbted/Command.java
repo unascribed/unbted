@@ -31,18 +31,22 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
 public class Command {
-	public interface Action {
+	public interface AliasUnawareAction {
 		void run(OptionSet set, List<String> args) throws Exception;
+	}
+	public interface AliasAwareAction {
+		void run(String alias, OptionSet set, List<String> args) throws Exception;
 	}
 	public interface Options {
 		void setup(OptionParser parser) throws Exception;
 	}
 	
-	private Action action;
+	private AliasAwareAction action;
 	private Completer completer;
 	private Options options;
 	private String description = "";
@@ -52,22 +56,27 @@ public class Command {
 	
 	private Command() {}
 	
-	public void execute(Iterable<String> args) throws Exception {
+	public void execute(String alias, Iterable<String> args) throws Exception {
 		if (action == null) return;
-		execute(Iterables.toArray(args, String.class));
+		execute(alias, Iterables.toArray(args, String.class));
 	}
 	
-	public void execute(String... args) throws Exception {
+	public void execute(String alias, String... args) throws Exception {
 		if (action == null) return;
 		OptionParser parser = new OptionParser();
 		setupOptionParser(parser);
-		OptionSet set = parser.parse(args);
-		execute(set);
+		OptionSet set;
+		try {
+			set = parser.parse(args);
+		} catch (OptionException e) {
+			throw new CommandException(e.getMessage());
+		}
+		execute(alias, set);
 	}
 	
-	public void execute(OptionSet set) throws Exception {
+	public void execute(String alias, OptionSet set) throws Exception {
 		if (action == null) return;
-		action.run(set, (List<String>)set.nonOptionArguments());
+		action.run(alias, set, (List<String>)set.nonOptionArguments());
 	}
 	
 	public void setupOptionParser(OptionParser parser) throws Exception {
@@ -99,8 +108,12 @@ public class Command {
 	}
 	
 	
+	public Command action(AliasUnawareAction action) {
+		this.action = (alias, set, args) -> action.run(set, args);
+		return this;
+	}
 	
-	public Command action(Action action) {
+	public Command action(AliasAwareAction action) {
 		this.action = action;
 		return this;
 	}

@@ -135,7 +135,23 @@ public class TagPrinter {
 		this.byteArrayFormatter = byteArrayFormatter;
 	}
 	
+	public void printTag(Tag tag) {
+		printTag(tag, "");
+	}
+	
+	public void printTag(Tag tag, String prefix) {
+		printTag(tag, prefix, NBTEd.INFER);
+	}
+	
+	public void printTag(Tag tag, String prefix, boolean infer) {
+		printTag(tag, prefix, infer, RecurseMode.FULL);
+	}
+	
 	public void printTag(Tag tag, String prefix, boolean infer, RecurseMode recurse) {
+		printTag(tag, prefix, infer, recurse, true);
+	}
+	
+	public void printTag(Tag tag, String prefix, boolean infer, RecurseMode recurse, boolean values) {
 		if (tag == null) {
 			return;
 		}
@@ -143,66 +159,74 @@ public class TagPrinter {
 			CompoundTag ct = (CompoundTag)tag;
 			if (recurse.shouldPrintRoot()) {
 				aout.print(prefix);
-				aout.print("compound", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
+				aout.print("compound ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
 				printName(tag.getName(), false);
 			}
-			if (recurse.shouldPrintChildren()) {
-				if (ct.getValue().isEmpty()) {
-					if (recurse.shouldPrintRoot()) aout.println(" {}", AnsiCode.RESET);
-				} else {
-					if (recurse.shouldPrintRoot()) aout.println(" {", AnsiCode.RESET);
-					String childPrefix = recurse.shouldPrintRoot() ? prefix+"  " : prefix;
-					for (Tag t : ct.getValue().values()) {
-						if (infer) {
-							if (t.getName().endsWith("Most") && ct.contains(t.getName().replaceFirst("Most$", "Least"))) {
-								Tag most = t;
-								Tag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
-								if (most instanceof LongTag && least instanceof LongTag) {
-									UUID u = new UUID((long)most.getValue(), (long)least.getValue());
-									printBasic(u, t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix);
-									continue;
+			if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
+				if (recurse.shouldPrintChildren()) {
+					if (ct.getValue().isEmpty()) {
+						if (recurse.shouldPrintRoot()) aout.println(" {}", AnsiCode.RESET);
+					} else {
+						if (recurse.shouldPrintRoot()) aout.println(" {", AnsiCode.RESET);
+						String childPrefix = recurse.shouldPrintRoot() ? prefix+"  " : prefix;
+						for (Tag t : ct.getValue().values()) {
+							if (infer) {
+								if (t.getName().endsWith("Most") && ct.contains(t.getName().replaceFirst("Most$", "Least"))) {
+									Tag most = t;
+									Tag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
+									if (most instanceof LongTag && least instanceof LongTag) {
+										UUID u = new UUID((long)most.getValue(), (long)least.getValue());
+										printBasic(u, t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix);
+										continue;
+									}
+								}
+								if (t.getName().endsWith("Least") && ct.contains(t.getName().replaceFirst("Least$", "Most"))) {
+									Tag most = ct.get(t.getName().replaceFirst("Least$", "Most"));
+									Tag least = t;
+									if (most instanceof LongTag && least instanceof LongTag) {
+										continue;
+									}
 								}
 							}
-							if (t.getName().endsWith("Least") && ct.contains(t.getName().replaceFirst("Least$", "Most"))) {
-								Tag most = ct.get(t.getName().replaceFirst("Least$", "Most"));
-								Tag least = t;
-								if (most instanceof LongTag && least instanceof LongTag) {
-									continue;
-								}
-							}
+							printTag(t, childPrefix, infer, recurse.degrade(), values);
 						}
-						printTag(t, childPrefix, infer, recurse.degrade());
+						if (recurse.shouldPrintRoot()) {
+							aout.print(prefix);
+							aout.println("}");
+						}
 					}
-					if (recurse.shouldPrintRoot()) {
-						aout.print(prefix);
-						aout.println("}");
+				} else if (recurse.shouldPrintRoot()) {
+					aout.print(" (", AnsiCode.RESET);
+					aout.print(ct.size());
+					aout.print(" child");
+					if (ct.size() != 1) {
+						aout.print("ren");
 					}
+					aout.println(")");
 				}
-			} else if (recurse.shouldPrintRoot()) {
-				aout.print(" (", AnsiCode.RESET);
-				aout.print(ct.size());
-				aout.print(" child");
-				if (ct.size() != 1) {
-					aout.print("ren");
-				}
-				aout.println(")");
+			} else {
+				aout.println(AnsiCode.RESET);
 			}
 		} else if (tag instanceof ListTag) {
 			ListTag lt = (ListTag)tag;
 			if (lt.getValue().isEmpty()) {
 				if (recurse.shouldPrintRoot()) {
 					aout.print(prefix);
-					aout.print("list", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
+					aout.print("list ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
 					printName(tag.getName(), false);
-					if (recurse.shouldPrintChildren()) {
-						aout.println(" []", AnsiCode.RESET);
+					if (values) {
+						if (recurse.shouldPrintChildren()) {
+							aout.println(" []", AnsiCode.RESET);
+						} else {
+							aout.println(" (0 children)", AnsiCode.RESET);
+						}
 					} else {
-						aout.println(" (0 children)", AnsiCode.RESET);
+						aout.println(AnsiCode.RESET);
 					}
 				}
 			} else {
 				boolean forgeRegistry = true;
-				if (recurse.shouldPrintChildren()) {
+				if (recurse.shouldPrintChildren() && values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 					Class<?> registryType = null;
 					if (infer) {
 						for (Tag t : lt.getValue()) {
@@ -229,7 +253,7 @@ public class TagPrinter {
 				if (forgeRegistry) {
 					if (recurse.shouldPrintRoot()) {
 						aout.print(prefix);
-						aout.print("~registry", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
+						aout.print("~registry ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
 						printName(tag.getName(), false);
 						aout.println(" [", AnsiCode.RESET);
 					}
@@ -260,26 +284,30 @@ public class TagPrinter {
 				} else {
 					if (recurse.shouldPrintRoot()) {
 						aout.print(prefix);
-						aout.print("list", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
+						aout.print("list ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
 						printName(tag.getName(), false);
 					}
-					if (recurse.shouldPrintChildren()) {
-						if (recurse.shouldPrintRoot()) aout.println(" [", AnsiCode.RESET);
-						for (Tag t : lt) {
-							printTag(t, recurse.shouldPrintRoot() ? prefix+"  " : prefix, infer, recurse);
+					if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
+						if (recurse.shouldPrintChildren()) {
+							if (recurse.shouldPrintRoot()) aout.println(" [", AnsiCode.RESET);
+							for (Tag t : lt) {
+								printTag(t, recurse.shouldPrintRoot() ? prefix+"  " : prefix, infer, recurse, values);
+							}
+							if (recurse.shouldPrintRoot()) {
+								aout.print(prefix);
+								aout.println("]");
+							}
+						} else if (recurse.shouldPrintRoot()) {
+							aout.print(" (", AnsiCode.RESET);
+							aout.print(lt.size());
+							aout.print(" child");
+							if (lt.size() != 1) {
+								aout.print("ren");
+							}
+							aout.println(")");
 						}
-						if (recurse.shouldPrintRoot()) {
-							aout.print(prefix);
-							aout.println("]");
-						}
-					} else if (recurse.shouldPrintRoot()) {
-						aout.print(" (", AnsiCode.RESET);
-						aout.print(lt.size());
-						aout.print(" child");
-						if (lt.size() != 1) {
-							aout.print("ren");
-						}
-						aout.println(")");
+					} else {
+						aout.println(AnsiCode.RESET);
 					}
 				}
 			}
@@ -306,65 +334,69 @@ public class TagPrinter {
 					}
 				}
 				if (maybeBoolean) {
-					printBasic((byte)tag.getValue() != 0, tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix);
+					printBasic(values ? (byte)tag.getValue() != 0 : null, tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix);
 					return;
 				}
 			}
-			printBasic(tag, "byte", AnsiCode.FG_YELLOW, prefix);
+			printBasic(tag, "byte", AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof ShortTag) {
-			printBasic(tag, "short", AnsiCode.FG_YELLOW, prefix);
+			printBasic(tag, "short", AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof IntTag) {
-			printBasic(tag, "int", AnsiCode.FG_YELLOW, prefix);
+			printBasic(tag, "int", AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof LongTag) {
-			printBasic(tag, "long", AnsiCode.FG_YELLOW, prefix);
+			printBasic(tag, "long", AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof FloatTag) {
-			printBasic(tag, "float", AnsiCode.FG_MAGENTA, prefix);
+			printBasic(tag, "float", AnsiCode.FG_MAGENTA, prefix, values);
 		} else if (tag instanceof DoubleTag) {
-			printBasic(tag, "double", AnsiCode.FG_MAGENTA, prefix);
+			printBasic(tag, "double", AnsiCode.FG_MAGENTA, prefix, values);
 		} else if (tag instanceof StringTag) {
 			if (infer) {
 				String str = (String)tag.getValue();
 				if (str.startsWith("{") || str.startsWith("[")) {
 					try {
 						JsonElement je = gson.fromJson(str, JsonElement.class);
-						StringWriter sw = new StringWriter();
-						JsonWriter jw = new JsonWriter(sw);
-						jw.setIndent("  ");
-						jw.setLenient(true);
-						gson.toJson(je, jw);
-						String jstr = sw.toString()
-								.replaceAll("[\\]\\[]", AnsiCode.RESET+"$1")
-								.replace("\n", "\n"+prefix+"  "+AnsiCode.FG_BLUE_INTENSE)
-								.replace(":", AnsiCode.RESET+":"+AnsiCode.FG_GREEN)
-								.replace(",", AnsiCode.RESET+",")
-								.replace("{", AnsiCode.RESET+"{")
-								.replace("}", AnsiCode.RESET+"}")
-								;
-						printBasic(recurse.shouldPrintChildren() ? "..." : jstr, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix);
+						if (values) {
+							StringWriter sw = new StringWriter();
+							JsonWriter jw = new JsonWriter(sw);
+							jw.setIndent("  ");
+							jw.setLenient(true);
+							gson.toJson(je, jw);
+							String jstr = sw.toString()
+									.replaceAll("[\\]\\[]", AnsiCode.RESET+"$1")
+									.replace("\n", "\n"+prefix+"  "+AnsiCode.FG_BLUE_INTENSE)
+									.replace(":", AnsiCode.RESET+":"+AnsiCode.FG_GREEN)
+									.replace(",", AnsiCode.RESET+",")
+									.replace("{", AnsiCode.RESET+"{")
+									.replace("}", AnsiCode.RESET+"}")
+									;
+							printBasic(recurse.shouldPrintChildren() ? jstr : "...", tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix);
+						} else {
+							printBasic(null, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix);
+						}
 						return;
 					} catch (Exception e) {}
 				}
 			}
-			printBasic(tag, "string", AnsiCode.FG_RED, prefix);
+			printBasic(tag, "string", AnsiCode.FG_RED, prefix, values);
 		} else if (tag instanceof ByteArrayTag) {
-			printBasic(tag, "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix);
+			printBasic(tag, "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof IntArrayTag) {
-			printBasic(tag, "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix);
+			printBasic(tag, "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof LongArrayTag) {
-			printBasic(tag, "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix);
+			printBasic(tag, "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof StringArrayTag) {
-			printBasic(tag, "!string[]", AnsiCode.FG_RED_INTENSE, prefix);
+			printBasic(tag, "!string[]", AnsiCode.FG_RED_INTENSE, prefix, values);
 		} else if (tag instanceof ShortArrayTag) {
-			printBasic(tag, "!short[]", AnsiCode.FG_YELLOW_INTENSE, prefix);
+			printBasic(tag, "!short[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof FloatArrayTag) {
-			printBasic(tag, "!float[]", AnsiCode.FG_MAGENTA_INTENSE, prefix);
+			printBasic(tag, "!float[]", AnsiCode.FG_MAGENTA_INTENSE, prefix, values);
 		} else if (tag instanceof DoubleArrayTag) {
-			printBasic(tag, "!double[]", AnsiCode.FG_MAGENTA_INTENSE, prefix);
+			printBasic(tag, "!double[]", AnsiCode.FG_MAGENTA_INTENSE, prefix, values);
 		}
 	}
 	
-	public void printBasic(Tag tag, String type, AnsiCode color, String prefix) {
-		Object val = tag.getValue();
+	public void printBasic(Tag tag, String type, AnsiCode color, String prefix, boolean value) {
+		Object val = value ? tag.getValue() : null;
 		if (val instanceof String) {
 			val = "\""+escaper.escape((String)val)+"\"";
 		}
@@ -374,7 +406,8 @@ public class TagPrinter {
 	public void printBasic(Object val, String name, String type, AnsiCode color, String prefix) {
 		aout.print(prefix);
 		aout.print(type, color);
-		printName(name, true);
+		aout.print(" ");
+		printName(name, val != null);
 		printVal(val);
 	}
 
@@ -403,7 +436,7 @@ public class TagPrinter {
 			aout.print(Arrays.toString((double[])val));
 		} else if (val instanceof Object[]) {
 			aout.print(Arrays.toString((Object[])val));
-		} else {
+		} else if (val != null) {
 			aout.print(val);
 		}
 		aout.println(AnsiCode.RESET);
@@ -411,7 +444,7 @@ public class TagPrinter {
 
 	public void printName(String name, boolean equals) {
 		if (name != null && !name.isEmpty()) {
-			aout.print(" \"", AnsiCode.FG_BLUE_INTENSE);
+			aout.print("\"", AnsiCode.FG_BLUE_INTENSE);
 			aout.print(escaper.escape(name));
 			aout.print("\"");
 			if (equals) {

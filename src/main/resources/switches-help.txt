@@ -6,58 +6,71 @@ Edit an NBT (Named Binary Tag) file interactively, or print it out in a
 JSON-like format for reading. Optionally convert it to well-formed JSON
 for processing.
 
-Type names prefixed with a ~ indicate inferred types, such as JSON strings
-or UUID long pairs. Type names prefixed with a ! indicate nonstandard
-OpenNBT extensions.
-
 Valid options:
 	-?, -h, --help
-		Print this help
+		Print this help.
 
-	-c=<method>, --compression=<method>
-		Assume the given compression method, rather than autodetecting
-		Valid methods are None, Deflate, and GZip
+	-c<method>, --compression=<method>
+		Assume the given compression method, rather than autodetecting.
+		Valid methods are None, Deflate, and GZip. (case-insensitive)
 
 	-d, -v, --debug, --verbose
-		Print more information and stacktraces
+		Print more information and stacktraces.
 
 	-x, --extended
-		Enable OpenNBT extensions
+		Enable OpenNBT extensions.
 			(incompatible with -o)
 
 	-o, --old
-		Disable newer additions to the NBT format, such as int arrays
+		Disable newer additions to the NBT format, such as int arrays.
 			(incompatible with -e)
 
 	-p, --print
-		Exit after printing file contents
+		Exit after printing file contents.
 			(incompatible with -n)
 
 	-n, --no-print
-		Don't print out initial file contents, just edit
+		Don't print out initial file contents, just edit.
 			(incompatible with -p)
 
-	-l, --little
-		Assume the input is a malformed little-endian NBT file
+	--endian=<endianness>, --big-endian, --little-endian
+		Assume the input is the given endianness, instead of attempting
+		to detect it. Historically, Pocket Edition had little-endian
+		NBT files as part of its save format, but this was replaced
+		with a custom LevelDB format in 0.9.0.
+		Tip: If you're attempting to read one of these files, they
+		contain extra metadata at the start of the file. I wasn't able
+		to obtain an example file to test with, so I did not add
+		support for stripping these headers. You may attempt to strip
+		them manually using dd - the entities.dat is supposed to have
+		12 bytes of junk, and the level.dat is supposed to have 8.
+		e.g. dd if=entities.dat of=entities.lnbt skip=12 iflag=skip_bytes
+		Valid endiannesses are Big and Little. (case-insensitive)
 
 	-s, -j, --strict, --json
-		Print out well-formed JSON instead of a human-readable JSON-like
-		colored format
+		Print out well-formed JSON instead of a human-readable
+		colored format.
 			(implies -f and -6)
 
 	-6, --base64
-		Print byte arrays as Base64 instead of hex
+		Print byte arrays as Base64 instead of hex.
 			(incompatible with -d)
 
 	-d, --decimal
-		Print byte arrays as decimal instead of hex
+		Print byte arrays as decimal instead of hex.
 			(incompatible with -6)
 
 	-f, --full
-		Don't truncate byte arrays in summaries
+		Don't truncate byte arrays in summaries.
 
 	-r, --raw
-		Don't infer types
+		Don't infer types.
 
 	--no-pager
-		Disable use of the embedded less-like pager
+		Disable use of the embedded less-like pager.
+
+Exit codes:
+	0: Success
+	1: Failed to parse command line
+	2: Failed to load file
+	3: Unexpected internal error
