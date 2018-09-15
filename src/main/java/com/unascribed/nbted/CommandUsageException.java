@@ -18,33 +18,22 @@
 
 package com.unascribed.nbted;
 
-import java.util.Locale;
+public class CommandUsageException extends CommandException {
 
-import com.google.common.base.Enums;
-
-import joptsimple.ValueConverter;
-
-public class CaseInsensitiveEnumConverter<E extends Enum<E>> implements ValueConverter<E> {
-
-	private final Class<E> clazz;
-	
-	public CaseInsensitiveEnumConverter(Class<E> clazz) {
-		this.clazz = clazz;
-	}
-	
-	@Override
-	public E convert(String value) {
-		return Enums.getIfPresent(clazz, value.toUpperCase(Locale.ROOT)).get();
+	public CommandUsageException() {
+		super();
 	}
 
-	@Override
-	public Class<? extends E> valueType() {
-		return clazz;
+	public CommandUsageException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
-	@Override
-	public String valuePattern() {
-		return clazz.getSimpleName().toLowerCase(Locale.ROOT);
+	public CommandUsageException(String message) {
+		super(message);
+	}
+
+	public CommandUsageException(Throwable cause) {
+		super(cause);
 	}
 
 }

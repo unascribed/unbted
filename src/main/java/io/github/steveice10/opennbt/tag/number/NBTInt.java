@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10
+ * Copyright (C) 2013-2017 Steveice10, 2018 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -20,59 +20,71 @@
  * SOFTWARE.
  */
 
-package io.github.steveice10.opennbt.tag.builtin;
+package io.github.steveice10.opennbt.tag.number;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-/**
- * A tag containing a short.
- */
-public class ShortTag extends Tag {
-	private short value;
+import io.github.steveice10.opennbt.tag.NBTTag;
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name The name of the tag.
-	 */
-	public ShortTag(String name, Tag parent) {
-		this(name, parent, (short) 0);
+public final class NBTInt extends NBTNumber implements Comparable<NBTInt> {
+	private int value;
+
+	public NBTInt(String name) {
+		this(name, 0);
 	}
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name  The name of the tag.
-	 * @param value The value of the tag.
-	 */
-	public ShortTag(String name, Tag parent, short value) {
-		super(name, parent);
+	public NBTInt(String name, int value) {
+		super(name);
 		this.value = value;
 	}
 
 	@Override
-	public Short getValue() {
+	public Integer numberValue() {
 		return this.value;
 	}
+	
+	@Override public byte byteValue() { return (byte)this.value; }
+	@Override public short shortValue() { return (short)this.value; }
+	@Override public int intValue() { return this.value; }
+	@Override public long longValue() { return this.value; }
+	@Override public float floatValue() { return this.value; }
+	@Override public double doubleValue() { return this.value; }
+	@Override public String stringValue() { return Integer.toString(this.value); }
 
-	/**
-	 * Sets the value of this tag.
-	 *
-	 * @param value New value of this tag.
-	 */
-	public void setValue(short value) {
+	public void setValue(int value) {
 		this.value = value;
 	}
 
 	@Override
 	public void read(DataInput in) throws IOException {
-		this.value = in.readShort();
+		this.value = in.readInt();
 	}
 
 	@Override
 	public void write(DataOutput out) throws IOException {
-		out.writeShort(this.value);
+		out.writeInt(this.value);
 	}
+	
+	@Override
+	public int compareTo(NBTInt that) {
+		return Integer.compare(this.value, that.value);
+	}
+	
+	@Override
+	protected boolean equalsChecked(NBTTag that) {
+		return this.value == ((NBTInt)that).value;
+	}
+
+	@Override
+	public int hashCode() {
+		return Integer.hashCode(value);
+	}
+
+	@Override
+	public String toString() {
+		return "NBTInt[value="+value+"]";
+	}
+	
 }

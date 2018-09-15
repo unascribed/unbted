@@ -51,6 +51,7 @@ public class Command {
 	private Options options;
 	private String description = "";
 	private String name = "";
+	private String usage = "";
 	private ImmutableList<String> aliases = ImmutableList.of();
 	private ImmutableSet<String> allNames = ImmutableSet.of();
 	
@@ -64,6 +65,7 @@ public class Command {
 	public void execute(String alias, String... args) throws Exception {
 		if (action == null) return;
 		OptionParser parser = new OptionParser();
+		parser.posixlyCorrect(System.getenv("POSIXLY_CORRECT") != null);
 		setupOptionParser(parser);
 		OptionSet set;
 		try {
@@ -97,6 +99,10 @@ public class Command {
 	
 	public String getName() {
 		return name;
+	}
+	
+	public String getUsage(String alias) {
+		return usage.replace("{}", alias);
 	}
 	
 	public ImmutableList<String> getAliases() {
@@ -142,6 +148,11 @@ public class Command {
 	public Command aliases(String... aliases) {
 		this.aliases = ImmutableList.copyOf(aliases);
 		this.allNames = ImmutableSet.copyOf(Iterables.concat(Collections.singleton(name), Arrays.asList(aliases)));
+		return this;
+	}
+	
+	public Command usage(String usage) {
+		this.usage = usage;
 		return this;
 	}
 	

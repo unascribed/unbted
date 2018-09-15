@@ -1,9 +1,10 @@
 #!/bin/bash
 echo -ne 'Invoking Gradle...\r'
-output=`gradle fatJar 2>&1 </dev/null`
+tmp=`mktemp`
+gradle fatJar </dev/null > $tmp 2>&1
 gradleExit=$?
 if [ "$gradleExit" != "0" ]; then
-	echo output
+	cat $tmp
 	exit $gradleExit
 else
 	echo -en 'Running program...\r'

@@ -50,6 +50,7 @@ import org.jline.utils.AttributedStyle;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
@@ -58,11 +59,13 @@ import com.unascribed.miniansi.AnsiCode;
 import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
-import io.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import io.github.steveice10.opennbt.tag.builtin.Tag;
+import io.github.steveice10.opennbt.NBTRegistry;
+import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTTag;
 import joptsimple.OptionDescriptor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSpec;
+import joptsimple.OptionSpecBuilder;
 
 public class CommandProcessor implements Completer, Highlighter {
 	
@@ -83,8 +86,8 @@ public class CommandProcessor implements Completer, Highlighter {
 	
 	private LineReader reader;
 	
-	private Tag root;
-	private Tag cursor;
+	private NBTTag root;
+	private NBTTag cursor;
 	
 	private final TagPrinter printer;
 	private final DefaultHistory history = new DefaultHistory();
@@ -92,7 +95,7 @@ public class CommandProcessor implements Completer, Highlighter {
 	
 	private boolean dirty = false;
 	
-	public CommandProcessor(Tag _root, TagPrinter _printer, FileInfo _fileInfo) {
+	public CommandProcessor(NBTTag _root, TagPrinter _printer, FileInfo _fileInfo) {
 		this.root = _root;
 		this.cursor = root;
 		this.printer = _printer;
@@ -100,30 +103,35 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("warranty")
 			.description("print GPLv3 warranty sections")
+			.usage("{}")
 			.action((set, args) -> {
-				if (args.size() > 0) throw new CommandException("Too many arguments");
+				if (args.size() > 0) throw new CommandUsageException("Too many arguments");
 				NBTEd.displayEmbeddedFileInPager("warranty.txt");
 			}));
 		addCommand(Command.create()
 			.name("copying")
 			.description("print GPLv3 text")
+			.usage("{}")
 			.action((set, args) -> {
-				if (args.size() > 0) throw new CommandException("Too many arguments");
+				if (args.size() > 0) throw new CommandUsageException("Too many arguments");
 				NBTEd.displayEmbeddedFileInPager("license.txt");
 			}));
 		addCommand(Command.create()
 			.name("help").aliases("?", "h")
 			.description("print help")
+			.usage("{}")
 			.action((set, args) -> {
-				if (args.size() > 0) throw new CommandException("Too many arguments");
+				if (args.size() > 0) throw new CommandUsageException("Too many arguments");
 				NBTEd.displayEmbeddedFileInPager("commands-help.txt");
 			}));
 		addCommand(Command.create()
 			.name("rem").aliases("comment", "remark", "#", "//")
-			.description("do nothing"));
+			.description("do nothing")
+			.usage("{} [anything]..."));
 		addCommand(Command.create()
 			.name("echo")
 			.description("print arguments")
+			.usage("{} [anything]...")
 			.options((parser) -> {
 				parser.accepts("e", "parse escapes");
 				parser.accepts("n", "don't emit a newline");
@@ -180,9 +188,10 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("cd")
 			.description("change command context")
+			.usage("{} <path>")
 			.completer(pathCompleter(true))
 			.action((set, args) -> {
-				if (args.size() > 1) throw new CommandException("Too many arguments");
+				if (args.size() > 1) throw new CommandUsageException("Too many arguments");
 				if (args.isEmpty()) {
 					cursor = root;
 				} else {
@@ -192,41 +201,48 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("ls").aliases("dir")
 			.description("list compound contents")
+			.usage("{} [path]...")
 			.completer(pathCompleter(false))
 			.options((parser) -> {
 				parser.acceptsAll(Arrays.asList("R", "recursive"), "list all descendants recursively");
 				parser.acceptsAll(Arrays.asList("d", "directory"), "print just the compound, no children");
 				parser.acceptsAll(Arrays.asList("r", "raw"), "do not infer types");
-				parser.acceptsAll(Arrays.asList("l", "long"), "print values");
-				parser.acceptsAll(Arrays.asList("1", "a", "A"), "ignored");
+				parser.acceptsAll(Arrays.asList("l", "1", "a", "A"), "ignored");
 			})
 			.action((set, args) -> {
 				boolean infer = NBTEd.INFER;
 				if (set.has("raw")) {
 					infer = false;
 				}
-				if (args.size() > 1) throw new CommandException("Too many arguments");
-				Tag tag = args.isEmpty() ? cursor : resolvePath(args.get(0), true, false);
-				if (set.has("directory")) {
-					printer.printTag(tag, "", infer, RecurseMode.NONE, set.has("l"));
+				Iterable<NBTTag> tags;
+				if (args.isEmpty()) {
+					tags = Collections.singleton(cursor);
 				} else {
-					printer.printTag(tag, "", infer, set.has("recursive") ? RecurseMode.FULL : RecurseMode.IMMEDIATE_CHILDREN_ONLY, set.has("l"));
+					tags = Iterables.transform(args, s -> resolvePath(s, true, false));
+				}
+				for (NBTTag tag : tags) {
+					if (set.has("directory")) {
+						printer.printTag(tag, "", infer, RecurseMode.NONE, true);
+					} else {
+						printer.printTag(tag, "", infer, set.has("recursive") ? RecurseMode.FULL : RecurseMode.IMMEDIATE_CHILDREN_ONLY, true);
+					}
 				}
 			}));
 		addCommand(Command.create()
 			.name("rm").aliases("del", "rmdir", "rd")
 			.description("delete a tag")
+			.usage("{} <path>...")
 			.completer(pathCompleter(false))
 			.options((parser) -> {
 				parser.acceptsAll(Arrays.asList("r", "recursive"), "delete non-empty compounds too");
 				parser.acceptsAll(Arrays.asList("f", "force"), "silence errors and keep going");
 			})
 			.action((set, args) -> {
-				if (args.isEmpty()) throw new CommandException("Missing argument");
+				if (args.isEmpty()) throw new CommandUsageException("Missing argument");
 				// REVERSE ORDER - cursor is at index 0, root is at (size()-1)
-				List<Tag> contextParents = Lists.newArrayList();
+				List<NBTTag> contextParents = Lists.newArrayList();
 				{
-					Tag t = cursor;
+					NBTTag t = cursor;
 					while (t != null) {
 						contextParents.add(t);
 						t = t.getParent();
@@ -234,17 +250,17 @@ public class CommandProcessor implements Completer, Highlighter {
 				}
 				for (String s : args) {
 					try {
-						Tag t = resolvePath(s, set.has("force"), false);
+						NBTTag t = resolvePath(s, set.has("force"), false);
 						if (t == null) {
 							throw new CommandException("No such tag with path "+s);
 						}
-						if (t instanceof CompoundTag) {
-							CompoundTag ct = (CompoundTag)t;
+						if (t instanceof NBTCompound) {
+							NBTCompound ct = (NBTCompound)t;
 							if (!ct.isEmpty() && !set.has("recursive")) {
 								throw new CommandException("Refusing to delete non-empty compound "+getPath(t)+" - add -r to override");
 							}
 						}
-						Tag parent = t.getParent();
+						NBTTag parent = t.getParent();
 						if (parent == null) {
 							if (t != root) {
 								throw new ConsistencyError("Tag has no parent but isn't the root!?");
@@ -255,8 +271,8 @@ public class CommandProcessor implements Completer, Highlighter {
 							// no action can possibly be more destructive than deleting the root, so break
 							break;
 						} else {
-							if (parent instanceof CompoundTag) {
-								CompoundTag ct = (CompoundTag)parent;
+							if (parent instanceof NBTCompound) {
+								NBTCompound ct = (NBTCompound)parent;
 								if (ct.contains(t.getName())) {
 									ct.remove(t.getName());
 									dirty = true;
@@ -287,11 +303,12 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("exit").aliases("abort")
 			.description("exit without saving")
+			.usage("{}")
 			.options((parser) -> {
 				parser.acceptsAll(Arrays.asList("f", "force"), "don't confirm with unsaved changes");
 			})
 			.action((alias, set, args) -> {
-				if (!args.isEmpty()) throw new CommandException("Too many arguments");
+				if (!args.isEmpty()) throw new CommandUsageException("Too many arguments");
 				if (dirty && !alias.equals("abort") && !set.has("force")) {
 					try {
 						boolean cont = true;
@@ -325,11 +342,12 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("info")
 			.description("print information about the loaded file")
+			.usage("{}")
 			.options((parser) -> {
 				parser.acceptsAll(Arrays.asList("si", "s"), "use si units instead of binary");
 			})
 			.action((set, args) -> {
-				if (!args.isEmpty()) throw new CommandException("Too many arguments");
+				if (!args.isEmpty()) throw new CommandUsageException("Too many arguments");
 				System.out.print("Root tag name: ");
 				System.out.println(root == null ? "(no root tag)" : Strings.isNullOrEmpty(root.getName()) ? "(none)" : root.getName());
 				System.out.print("Loaded from: ");
@@ -376,6 +394,7 @@ public class CommandProcessor implements Completer, Highlighter {
 		addCommand(Command.create()
 			.name("save")
 			.description("write the nbt file to disk")
+			.usage("{} [file]")
 			.completer(new Completers.FileNameCompleter())
 			.options((parser) -> {
 				parser.accepts("endian", "write in the given endianness").withRequiredArg().ofType(Endianness.class)
@@ -389,7 +408,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				parser.acceptsAll(Arrays.asList("default", "d"), "update default file");
 			})
 			.action((set, args) -> {
-				if (args.size() > 1) throw new CommandException("Too many arguments");
+				if (args.size() > 1) throw new CommandUsageException("Too many arguments");
 				if (root == null) {
 					throw new CommandException("Nothing to write");
 				}
@@ -447,6 +466,42 @@ public class CommandProcessor implements Completer, Highlighter {
 					throw new CommandException("An error occurred while writing");
 				}
 			}));
+		addCommand(Command.create()
+			.name("mkdir")
+			.description("create compounds")
+			.usage("{} <path>...")
+			.completer(pathCompleter(true))
+			.action((set, args) -> {
+				if (args.isEmpty()) throw new CommandUsageException("Missing argument");
+				for (String s : args) {
+					NBTTag tag = resolvePath(s, false, false);
+					if (tag == null) {
+						commands.get("set").execute("set", "--type=compound", s);
+					} else if (!(tag instanceof NBTCompound)) {
+						throw new CommandException(s+" already exists and is not a compound");
+					}
+				}
+			}));
+		addCommand(Command.create()
+			.name("set").aliases("put", "new", "create")
+			.description("write values")
+			.usage("{} <path> [data]")
+			.completer(pathCompleter(false))
+			.options((parser) -> {
+				parser.accepts("no-overwrite", "error when attempting to overwrite");
+				parser.accepts("type", "type of value to set").withRequiredArg();
+				List<OptionSpecBuilder> exclusive = Lists.newArrayListWithCapacity(NBTRegistry.allTypeNames().size());
+				for (String s : NBTRegistry.allTypeNames()) {
+					exclusive.add(parser.accepts(s, "equivalent to --type="+s).availableUnless("type"));
+				}
+				parser.mutuallyExclusive(exclusive.toArray(new OptionSpecBuilder[exclusive.size()]));
+			})
+			.action((alias, set, args) -> {
+				if (args.isEmpty()) throw new CommandUsageException("Not enough arguments");
+				boolean noOverwrite = set.has("no-overwrite");
+				if ("create".equals(alias) || "new".equals(alias)) noOverwrite = true;
+				// TODO
+			}));
 	}
 	
 	private static String humanReadableBytes(long bytes, boolean si) {
@@ -483,29 +538,29 @@ public class CommandProcessor implements Completer, Highlighter {
 	private Completer pathCompleter(boolean compoundOnly) {
 		return (reader, line, candidates) -> {
 			if (line.word().startsWith("-") && line.wordIndex() < line.words().indexOf("--")) return;
-			if (cursor instanceof CompoundTag) {
+			if (cursor instanceof NBTCompound) {
 				String word = line.word();
 				int cur = line.wordCursor();
-				Tag tag = cursor;
+				NBTTag tag = cursor;
 				String left = word.substring(0, cur);
 				String prefix = "";
 				if (left.contains("/")) {
 					List<String> split = SLASH_SPLITTER.splitToList(left);
 					for (int i = 0; i < split.size()-1; i++) {
 						String s = split.get(i);
-						if (tag instanceof CompoundTag && ((CompoundTag)tag).contains(s)) {
+						if (tag instanceof NBTCompound && ((NBTCompound)tag).contains(s)) {
 							prefix += s+"/";
-							tag = ((CompoundTag)tag).get(s);
+							tag = ((NBTCompound)tag).get(s);
 						} else {
 							return;
 						}
 					}
 					left = split.get(split.size()-1);
 				}
-				if (tag instanceof CompoundTag) {
-					for (Tag t : ((CompoundTag)tag).values()) {
-						if (!compoundOnly || t instanceof CompoundTag) {
-							boolean leaf = !(t instanceof CompoundTag) || ((CompoundTag)t).isEmpty();
+				if (tag instanceof NBTCompound) {
+					for (NBTTag t : ((NBTCompound)tag).values()) {
+						if (!compoundOnly || t instanceof NBTCompound) {
+							boolean leaf = !(t instanceof NBTCompound) || ((NBTCompound)t).isEmpty();
 							String suff = leaf ? "" : "/";
 							candidates.add(new Candidate(prefix+t.getName()+suff, t.getName()+suff, null, null, suff, null, leaf));
 						}
@@ -517,22 +572,22 @@ public class CommandProcessor implements Completer, Highlighter {
 		};
 	}
 	
-	private Tag resolvePath(String string, boolean error, boolean compoundOnly) throws CommandException {
-		Tag cursorWork = cursor;
+	private NBTTag resolvePath(String string, boolean error, boolean compoundOnly) throws CommandException {
+		NBTTag cursorWork = cursor;
 		if (string.startsWith("/")) {
 			cursorWork = root;
 		}
 		List<String> parts = Lists.newArrayList(SLASH_SPLITTER.split(string));
 		for (int i = 0; i <= parts.size(); i++) {
 			String s = i == parts.size() ? null : parts.get(i);
-			if (cursorWork instanceof CompoundTag) {
+			if (cursorWork instanceof NBTCompound) {
 				if (s != null) {
 					if (s.equals("..")) {
 						cursorWork = cursorWork.getParent();
 					} else if (s.equals(".") || s.isEmpty()) {
 						continue;
 					} else {
-						CompoundTag c = (CompoundTag)cursorWork;
+						NBTCompound c = (NBTCompound)cursorWork;
 						if (c.contains(s)) {
 							cursorWork = c.get(s);
 						} else {
@@ -606,6 +661,9 @@ public class CommandProcessor implements Completer, Highlighter {
 								command.execute(commandStr, words.subList(1, words.size()));
 							} catch (CommandException e) {
 								System.err.println(reader.getAppName()+": "+commandStr+": "+e.getMessage());
+								if (e instanceof CommandUsageException) {
+									System.err.println(reader.getAppName()+": "+commandStr+": usage: "+command.getUsage(commandStr));
+								}
 							}
 						} else {
 							System.err.println(reader.getAppName()+": Unknown command");
@@ -623,8 +681,8 @@ public class CommandProcessor implements Completer, Highlighter {
 			}
 		}
 	}
-	
-	private String getPath(Tag t) {
+
+	private String getPath(NBTTag t) {
 		List<String> parts = Lists.newArrayList();
 		while (t != null) {
 			parts.add(t.getName());

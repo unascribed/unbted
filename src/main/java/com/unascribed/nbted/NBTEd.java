@@ -18,7 +18,7 @@
 
 package com.unascribed.nbted;
 
-import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,12 +44,13 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Function;
 import com.google.common.io.BaseEncoding;
+import com.google.common.io.ByteStreams;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.stream.JsonWriter;
@@ -57,10 +58,14 @@ import com.unascribed.miniansi.AnsiStream;
 import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
-import io.github.steveice10.opennbt.tag.TagRegistry;
-import io.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import io.github.steveice10.opennbt.tag.builtin.ListTag;
-import io.github.steveice10.opennbt.tag.builtin.Tag;
+import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTList;
+import io.github.steveice10.opennbt.tag.NBTString;
+import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.NBTByteArray;
+import io.github.steveice10.opennbt.tag.array.NBTIntArray;
+import io.github.steveice10.opennbt.tag.array.NBTLongArray;
+import io.github.steveice10.opennbt.tag.number.NBTNumber;
 import joptsimple.NonOptionArgumentSpec;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
@@ -80,8 +85,6 @@ public class NBTEd {
 	
 	public static boolean VERBOSE = true;
 	public static boolean JSON = false;
-	public static boolean TRUNCATE = true;
-	public static boolean DECIMAL_BYTES = false;
 	public static boolean INFER = true;
 	public static boolean PAGER = true;
 	
@@ -122,8 +125,6 @@ public class NBTEd {
 	private static final Gson gson = new Gson();
 	public static Terminal terminal;
 	
-	private static Function<byte[], String> byteArrayFormatter;
-	
 	public static void main(String[] args) throws Exception {
 		UncaughtExceptionHandler ueh = (t, e) -> {
 			if (VERBOSE) {
@@ -148,10 +149,6 @@ public class NBTEd {
 		Thread.currentThread().setUncaughtExceptionHandler(ueh);
 		OptionParser parser = new OptionParser();
 		parser.acceptsAll(Arrays.asList("help", "h")).forHelp();
-		parser.mutuallyExclusive(
-			parser.acceptsAll(Arrays.asList("extended", "x")),
-			parser.acceptsAll(Arrays.asList("old", "o"))
-		);
 		OptionSpec<Endianness> endiannessOpt = parser.accepts("endian").withRequiredArg().ofType(Endianness.class)
 				.withValuesConvertedBy(new CaseInsensitiveEnumConverter<>(Endianness.class));
 		parser.mutuallyExclusive(
@@ -165,12 +162,7 @@ public class NBTEd {
 			parser.acceptsAll(Arrays.asList("print", "p")),
 			parser.acceptsAll(Arrays.asList("no-print", "n"))
 		);
-		parser.acceptsAll(Arrays.asList("strict", "json", "s", "j"));
-		parser.mutuallyExclusive(
-				parser.acceptsAll(Arrays.asList("base64", "6")),
-				parser.acceptsAll(Arrays.asList("decimal", "d"))
-			);
-		parser.acceptsAll(Arrays.asList("full", "f"));
+		parser.acceptsAll(Arrays.asList("json", "j"));
 		parser.acceptsAll(Arrays.asList("raw", "r"));
 		parser.acceptsAll(Arrays.asList("no-pager"));
 		parser.posixlyCorrect(System.getenv("POSIXLY_CORRECT") != null);
@@ -212,67 +204,48 @@ public class NBTEd {
 		}
 		String in = set.valueOf(nonoption);
 		File sourceFile;
-		InputStream is;
+		ExceptableSupplier<InputStream, IOException> inSupplier;
 		if (in == null || in.isEmpty()) {
 			sourceFile = null;
-			is = null;
+			inSupplier = null;
 		} else { 
 			if ("-".equals(in)) {
-				is = System.in;
+				byte[] bys = ByteStreams.toByteArray(System.in);
+				inSupplier = () -> new ByteArrayInputStream(bys);
 				sourceFile = FileInfo.STDIN;
 				log("Reading from stdin");
 			} else {
 				File f = new File(in);
-				is = new FileInputStream(f);
+				inSupplier = () -> new FileInputStream(f);
 				sourceFile = f;
 				log("Reading from file {}", f);
 			}
-			is = new BufferedInputStream(is);
-		}
-		if (set.has("extended")) {
-			TagRegistry.EXTENSIONS_ENABLED = true;
-			log("OpenNBT extensions enabled (except the dangerous Serializable tags)");
-		}
-		if (set.has("old")) {
-			TagRegistry.NEWTAGS_ENABLED = false;
-			log("Newer NBT additions disabled (i.e. int and long arrays)");
 		}
 		if (set.has("json")) {
 			JSON = true;
-			TRUNCATE = false;
-		} else if (set.has("full")) {
-			TRUNCATE = false;
-		}
-		if (set.has("base64")) {
-			byteArrayFormatter = BaseEncoding.base64()::encode;
-		} else if (set.has("decimal")) {
-			byteArrayFormatter = Arrays::toString;
-			DECIMAL_BYTES = true;
-		} else {
-			byteArrayFormatter = BaseEncoding.base16().upperCase()::encode;
 		}
 		if (set.has("raw")) {
 			INFER = false;
 		}
 		Compression compressionMethod = set.valueOf(compressionOpt);
 		Compression detectedCompressionMethod = null;
-		if (is != null) {
-			is.mark(2);
-			int magic8 = is.read() & 0xff;
-			int magic16 = magic8 | ((is.read() << 8) & 0xff00);
-			is.reset();
-			if (magic16 == GZIPInputStream.GZIP_MAGIC) {
-				detectedCompressionMethod = Compression.GZIP;
-			} else if (magic8 == 0x78) {
-				detectedCompressionMethod = Compression.DEFLATE;
-			} else {
-				detectedCompressionMethod = Compression.NONE;
+		if (inSupplier != null) {
+			try (InputStream is = inSupplier.get()) {
+				int magic8 = is.read() & 0xff;
+				int magic16 = magic8 | ((is.read() << 8) & 0xff00);
+				if (magic16 == GZIPInputStream.GZIP_MAGIC) {
+					detectedCompressionMethod = Compression.GZIP;
+				} else if (magic8 == 0x78) {
+					detectedCompressionMethod = Compression.DEFLATE;
+				} else {
+					detectedCompressionMethod = Compression.NONE;
+				}
+				log("Compression autodetected as {}", detectedCompressionMethod);
 			}
-			log("Compression autodetected as {}", detectedCompressionMethod);
 		}
 		boolean compressionAutodetected;
 		if (compressionMethod == null) {
-			if (is != null) {
+			if (inSupplier != null) {
 				compressionMethod = detectedCompressionMethod;
 				log("Using autodetected compression method");
 				compressionAutodetected = true;
@@ -293,21 +266,31 @@ public class NBTEd {
 		} else if (set.has("big-endian")) {
 			endianness = Endianness.BIG;
 		}
-		Tag tag = null;
-		if (is != null) {
+		NBTTag tag = null;
+		if (inSupplier != null) {
 			try {
-				is = compressionMethod == null ? is : compressionMethod.wrap(is);
+				if (compressionMethod != null) {
+					final Compression compressionMethodFinal = compressionMethod;
+					final ExceptableSupplier<InputStream, IOException> currentSupplier = inSupplier;
+					inSupplier = () -> compressionMethodFinal.wrap(currentSupplier.get());
+				}
 				if (endianness != null) {
-					tag = NBTIO.readTag(endianness.wrap(is), null);
+					try (InputStream is = inSupplier.get()) {
+						tag = NBTIO.readTag(endianness.wrap(is));
+					}
 				} else {
 					try {
-						tag = NBTIO.readTag(is, false, null);
+						try (InputStream is = inSupplier.get()) {
+							tag = NBTIO.readTag(is, false);
+						}
 						if (tag == null) throw new RuntimeException("Got null root tag");
 						endianness = Endianness.BIG;
 						log("Endianness autodetected as big-endian");
 					} catch (Exception e) {
 						try {
-							tag = NBTIO.readTag(is, true, null);
+							try (InputStream is = inSupplier.get()) {
+								tag = NBTIO.readTag(is, true);
+							}
 							if (tag == null) throw new RuntimeException("Got null root tag");
 							endianness = Endianness.LITTLE;
 							log("Endianness autodetected as little-endian");
@@ -345,7 +328,9 @@ public class NBTEd {
 		} else {
 			endianness = Endianness.BIG;
 		}
-		TagPrinter printer = new TagPrinter(System.out, byteArrayFormatter);
+		// allow gc, especially for fully-buffered stdin
+		inSupplier = null;
+		TagPrinter printer = new TagPrinter(System.out);
 		if (!set.has("no-print")) {
 			if (JSON) {
 				JsonElement e = toJson(tag);
@@ -372,65 +357,39 @@ public class NBTEd {
 		}
 	}
 	
-	private static JsonElement toJson(Tag tag) {
-		if (tag instanceof CompoundTag) {
+	private static JsonElement toJson(NBTTag tag) {
+		if (tag == null) {
+			return JsonNull.INSTANCE;
+		} else if (tag instanceof NBTCompound) {
 			JsonObject out = new JsonObject();
-			CompoundTag in = (CompoundTag)tag;
-			for (Tag t : in.getValue().values()) {
+			NBTCompound in = (NBTCompound)tag;
+			for (NBTTag t : in.values()) {
 				out.add(t.getName(), toJson(t));
 			}
 			return out;
-		} else if (tag instanceof ListTag) {
+		} else if (tag instanceof NBTList) {
 			JsonArray out = new JsonArray();
-			ListTag in = (ListTag)tag;
-			for (Tag t : in) {
+			NBTList in = (NBTList)tag;
+			for (NBTTag t : in) {
 				out.add(toJson(t));
 			}
 			return out;
-		}
-		Object val = tag.getValue();
-		return bareToJson(val);
-	}
-	
-	private static JsonElement bareToJson(Object val) {
-		if (val instanceof String) {
-			return new JsonPrimitive((String)val);
-		} else if (val instanceof Number) {
-			return new JsonPrimitive((Number)val);
-		} else if (val instanceof byte[]) {
-			if (DECIMAL_BYTES) {
-				JsonArray out = new JsonArray();
-				for (byte v : (byte[])val) { out.add(v); }
-				return out;
-			} else {
-				return new JsonPrimitive(byteArrayFormatter.apply((byte[])val));
-			}
-		} else if (val instanceof short[]) {
+		} else if (tag instanceof NBTNumber) {
+			return new JsonPrimitive(((NBTNumber)tag).numberValue());
+		} else if (tag instanceof NBTString) {
+			return new JsonPrimitive(((NBTString)tag).stringValue());
+		} else if (tag instanceof NBTByteArray) {
+			return new JsonPrimitive(BaseEncoding.base64().encode(((NBTByteArray)tag).getValue()));
+		} else if (tag instanceof NBTIntArray) {
 			JsonArray out = new JsonArray();
-			for (short v : (short[])val) { out.add(v); }
+			for (int v : ((NBTIntArray)tag).getValue()) { out.add(v); }
 			return out;
-		} else if (val instanceof int[]) {
+		} else if (tag instanceof NBTLongArray) {
 			JsonArray out = new JsonArray();
-			for (int v : (int[])val) { out.add(v); }
-			return out;
-		} else if (val instanceof long[]) {
-			JsonArray out = new JsonArray();
-			for (long v : (long[])val) { out.add(v); }
-			return out;
-		} else if (val instanceof float[]) {
-			JsonArray out = new JsonArray();
-			for (float v : (float[])val) { out.add(v); }
-			return out;
-		} else if (val instanceof double[]) {
-			JsonArray out = new JsonArray();
-			for (double v : (double[])val) { out.add(v); }
-			return out;
-		} else if (val instanceof Object[]) {
-			JsonArray out = new JsonArray();
-			for (Object v : (Object[])val) { out.add(bareToJson(v)); }
+			for (long v : ((NBTLongArray)tag).getValue()) { out.add(v); }
 			return out;
 		} else {
-			throw new IllegalArgumentException("Don't know how to convert "+val+" ("+val.getClass().getSimpleName()+") to JSON");
+			throw new IllegalArgumentException("Don't know how to convert "+tag.getClass().getSimpleName()+" to JSON");
 		}
 	}
 

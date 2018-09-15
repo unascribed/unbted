@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10
+ * Copyright (C) 2013-2017 Steveice10, 2018 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -20,98 +20,79 @@
  * SOFTWARE.
  */
 
-package io.github.steveice10.opennbt.tag.builtin;
+package io.github.steveice10.opennbt.tag.array;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
 
-/**
- * A tag containing a long array.
- */
-public class LongArrayTag extends Tag {
-	private long[] value;
+import io.github.steveice10.opennbt.tag.NBTTag;
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name The name of the tag.
-	 */
-	public LongArrayTag(String name, Tag parent) {
-		this(name, parent, new long[0]);
+public class NBTByteArray extends NBTArray {
+	private byte[] value;
+
+	public NBTByteArray(String name) {
+		this(name, new byte[0]);
 	}
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name  The name of the tag.
-	 * @param value The value of the tag.
-	 */
-	public LongArrayTag(String name, Tag parent, long[] value) {
-		super(name, parent);
+	public NBTByteArray(String name, byte[] value) {
+		super(name);
 		this.value = value;
 	}
 
-	@Override
-	public long[] getValue() {
+	public byte[] getValue() {
 		return this.value.clone();
 	}
 
-	/**
-	 * Sets the value of this tag.
-	 *
-	 * @param value New value of this tag.
-	 */
-	public void setValue(long[] value) {
-		if(value == null) {
-			return;
-		}
-
+	public void setValue(byte[] value) {
+		if (value == null) return;
 		this.value = value.clone();
 	}
 
-	/**
-	 * Gets a value in this tag's array.
-	 *
-	 * @param index Index of the value.
-	 * @return The value at the given index.
-	 */
-	public long getValue(int index) {
+	public byte getValue(int index) {
 		return this.value[index];
 	}
 
-	/**
-	 * Sets a value in this tag's array.
-	 *
-	 * @param index Index of the value.
-	 * @param value Value to set.
-	 */
-	public void setValue(int index, long value) {
+	public void setValue(int index, byte value) {
 		this.value[index] = value;
 	}
+	
+	@Override
+	public String stringValue() {
+		return Arrays.toString(value);
+	}
 
-	/**
-	 * Gets the length of this tag's array.
-	 *
-	 * @return This tag's array length.
-	 */
+	@Override
 	public int length() {
 		return this.value.length;
 	}
 
 	@Override
 	public void read(DataInput in) throws IOException {
-		this.value = new long[in.readInt()];
-		for(int index = 0; index < this.value.length; index++) {
-			this.value[index] = in.readLong();
-		}
+		this.value = new byte[in.readInt()];
+		in.readFully(this.value);
 	}
 
 	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeInt(this.value.length);
-		for(int index = 0; index < this.value.length; index++) {
-			out.writeLong(this.value[index]);
-		}
+		out.write(this.value);
 	}
+
+	@Override
+	protected boolean equalsChecked(NBTTag that) {
+		return Arrays.equals(this.value, ((NBTByteArray)that).value);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(this.value);
+	}
+
+	@Override
+	public String toString() {
+		return "NBTByteArray"+Arrays.toString(this.value);
+	}
+	
 }

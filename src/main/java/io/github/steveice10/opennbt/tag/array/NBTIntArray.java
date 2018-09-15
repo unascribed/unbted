@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10
+ * Copyright (C) 2013-2017 Steveice10, 2018 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -20,100 +20,83 @@
  * SOFTWARE.
  */
 
-package io.github.steveice10.opennbt.tag.builtin.custom;
+package io.github.steveice10.opennbt.tag.array;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
 
-import io.github.steveice10.opennbt.tag.builtin.Tag;
+import io.github.steveice10.opennbt.tag.NBTTag;
 
-/**
- * A tag containing a string array.
- */
-public class StringArrayTag extends Tag implements Extension {
-	private String[] value;
+public class NBTIntArray extends NBTArray {
+	private int[] value;
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name The name of the tag.
-	 */
-	public StringArrayTag(String name, Tag parent) {
-		this(name, parent, new String[0]);
+	public NBTIntArray(String name) {
+		this(name, new int[0]);
 	}
 
-	/**
-	 * Creates a tag with the specified name.
-	 *
-	 * @param name  The name of the tag.
-	 * @param value The value of the tag.
-	 */
-	public StringArrayTag(String name, Tag parent, String[] value) {
-		super(name, parent);
+	public NBTIntArray(String name, int[] value) {
+		super(name);
 		this.value = value;
 	}
 
-	@Override
-	public String[] getValue() {
+	public int[] getValue() {
 		return this.value.clone();
 	}
 
-	/**
-	 * Sets the value of this tag.
-	 *
-	 * @param value New value of this tag.
-	 */
-	public void setValue(String[] value) {
-		if(value == null) {
-			return;
-		}
-
+	public void setValue(int[] value) {
+		if (value == null) return;
 		this.value = value.clone();
 	}
 
-	/**
-	 * Gets a value in this tag's array.
-	 *
-	 * @param index Index of the value.
-	 * @return The value at the given index.
-	 */
-	public String getValue(int index) {
+	public int getValue(int index) {
 		return this.value[index];
 	}
 
-	/**
-	 * Sets a value in this tag's array.
-	 *
-	 * @param index Index of the value.
-	 * @param value Value to set.
-	 */
-	public void setValue(int index, String value) {
+	public void setValue(int index, int value) {
 		this.value[index] = value;
 	}
+	
+	@Override
+	public String stringValue() {
+		return Arrays.toString(value);
+	}
 
-	/**
-	 * Gets the length of this tag's array.
-	 *
-	 * @return This tag's array length.
-	 */
+	@Override
 	public int length() {
 		return this.value.length;
 	}
 
 	@Override
 	public void read(DataInput in) throws IOException {
-		this.value = new String[in.readInt()];
-		for(int index = 0; index < this.value.length; index++) {
-			this.value[index] = in.readUTF();
+		this.value = new int[in.readInt()];
+		for (int i = 0; i < this.value.length; i++) {
+			this.value[i] = in.readInt();
 		}
 	}
 
 	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeInt(this.value.length);
-		for(int index = 0; index < this.value.length; index++) {
-			out.writeUTF(this.value[index]);
+		for (int i = 0; i < this.value.length; i++) {
+			out.writeInt(this.value[i]);
 		}
 	}
+	
+	@Override
+	protected boolean equalsChecked(NBTTag that) {
+		return Arrays.equals(this.value, ((NBTIntArray)that).value);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(this.value);
+	}
+
+	@Override
+	public String toString() {
+		return "NBTIntArray"+Arrays.toString(this.value);
+	}
+	
 }

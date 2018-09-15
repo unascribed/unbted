@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10
+ * Copyright (C) 2013-2017 Steveice10, 2018 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -38,9 +38,8 @@ import java.io.OutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import io.github.steveice10.opennbt.tag.TagRegistry;
-import io.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import io.github.steveice10.opennbt.tag.builtin.Tag;
+import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTTag;
 
 /**
  * A class containing methods for reading/writing NBT tags.
@@ -53,7 +52,7 @@ public class NBTIO {
 	 * @return The read compound tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static CompoundTag readFile(String path) throws IOException {
+	public static NBTCompound readFile(String path) throws IOException {
 		return readFile(new File(path));
 	}
 
@@ -64,7 +63,7 @@ public class NBTIO {
 	 * @return The read compound tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static CompoundTag readFile(File file) throws IOException {
+	public static NBTCompound readFile(File file) throws IOException {
 		return readFile(file, true, false);
 	}
 
@@ -77,7 +76,7 @@ public class NBTIO {
 	 * @return The read compound tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static CompoundTag readFile(String path, boolean compressed, boolean littleEndian) throws IOException {
+	public static NBTCompound readFile(String path, boolean compressed, boolean littleEndian) throws IOException {
 		return readFile(new File(path), compressed, littleEndian);
 	}
 
@@ -90,18 +89,18 @@ public class NBTIO {
 	 * @return The read compound tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static CompoundTag readFile(File file, boolean compressed, boolean littleEndian) throws IOException {
+	public static NBTCompound readFile(File file, boolean compressed, boolean littleEndian) throws IOException {
 		InputStream in = new FileInputStream(file);
 		if(compressed) {
 			in = new GZIPInputStream(in);
 		}
 
-		Tag tag = readTag(in, littleEndian, null);
-		if(!(tag instanceof CompoundTag)) {
+		NBTTag tag = readTag(in, littleEndian);
+		if(!(tag instanceof NBTCompound)) {
 			throw new IOException("Root tag is not a CompoundTag!");
 		}
 
-		return (CompoundTag) tag;
+		return (NBTCompound) tag;
 	}
 
 	/**
@@ -111,7 +110,7 @@ public class NBTIO {
 	 * @param path Path to write to.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeFile(CompoundTag tag, String path) throws IOException {
+	public static void writeFile(NBTCompound tag, String path) throws IOException {
 		writeFile(tag, new File(path));
 	}
 
@@ -122,7 +121,7 @@ public class NBTIO {
 	 * @param file File to write to.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeFile(CompoundTag tag, File file) throws IOException {
+	public static void writeFile(NBTCompound tag, File file) throws IOException {
 		writeFile(tag, file, true, false);
 	}
 
@@ -135,7 +134,7 @@ public class NBTIO {
 	 * @param littleEndian Whether to write little endian NBT.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeFile(CompoundTag tag, String path, boolean compressed, boolean littleEndian) throws IOException {
+	public static void writeFile(NBTCompound tag, String path, boolean compressed, boolean littleEndian) throws IOException {
 		writeFile(tag, new File(path), compressed, littleEndian);
 	}
 
@@ -148,7 +147,7 @@ public class NBTIO {
 	 * @param littleEndian Whether to write little endian NBT.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeFile(CompoundTag tag, File file, boolean compressed, boolean littleEndian) throws IOException {
+	public static void writeFile(NBTCompound tag, File file, boolean compressed, boolean littleEndian) throws IOException {
 		if(!file.exists()) {
 			if(file.getParentFile() != null && !file.getParentFile().exists()) {
 				file.getParentFile().mkdirs();
@@ -173,8 +172,8 @@ public class NBTIO {
 	 * @return The read tag, or null if the tag is an end tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static Tag readTag(InputStream in, Tag parent) throws IOException {
-		return readTag(in, false, parent);
+	public static NBTTag readTag(InputStream in) throws IOException {
+		return readTag(in, false);
 	}
 
 	/**
@@ -185,8 +184,8 @@ public class NBTIO {
 	 * @return The read tag, or null if the tag is an end tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static Tag readTag(InputStream in, boolean littleEndian, Tag parent) throws IOException {
-		return readTag((DataInput)(littleEndian ? new LittleEndianDataInputStream(in) : new DataInputStream(in)), parent);
+	public static NBTTag readTag(InputStream in, boolean littleEndian) throws IOException {
+		return readTag((DataInput)(littleEndian ? new LittleEndianDataInputStream(in) : new DataInputStream(in)));
 	}
 
 	/**
@@ -196,17 +195,17 @@ public class NBTIO {
 	 * @return The read tag, or null if the tag is an end tag.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static Tag readTag(DataInput in, Tag parent) throws IOException {
+	public static NBTTag readTag(DataInput in) throws IOException {
 		int id = in.readUnsignedByte();
 		if(id == 0) {
 			return null;
 		}
 
 		String name = in.readUTF();
-		Tag tag;
+		NBTTag tag;
 
 		try {
-			tag = TagRegistry.createInstance(id, name, parent);
+			tag = NBTRegistry.createInstance(id, name);
 		} catch(Exception e) {
 			throw new IOException("Failed to create tag.", e);
 		}
@@ -222,7 +221,7 @@ public class NBTIO {
 	 * @param tag Tag to write.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeTag(OutputStream out, Tag tag) throws IOException {
+	public static void writeTag(OutputStream out, NBTTag tag) throws IOException {
 		writeTag(out, tag, false);
 	}
 
@@ -234,7 +233,7 @@ public class NBTIO {
 	 * @param littleEndian Whether to write little endian NBT.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeTag(OutputStream out, Tag tag, boolean littleEndian) throws IOException {
+	public static void writeTag(OutputStream out, NBTTag tag, boolean littleEndian) throws IOException {
 		writeTag((DataOutput) (littleEndian ? new LittleEndianDataOutputStream(out) : new DataOutputStream(out)), tag);
 	}
 
@@ -245,8 +244,8 @@ public class NBTIO {
 	 * @param tag Tag to write.
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
-	public static void writeTag(DataOutput out, Tag tag) throws IOException {
-		out.writeByte(TagRegistry.getIdFor(tag.getClass()));
+	public static void writeTag(DataOutput out, NBTTag tag) throws IOException {
+		out.writeByte(NBTRegistry.idForClass(tag.getClass()));
 		out.writeUTF(tag.getName());
 		tag.write(out);
 	}
@@ -513,4 +512,5 @@ public class NBTIO {
 			this.write(bytes);
 		}
 	}
+	
 }

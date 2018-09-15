@@ -1,15 +1,32 @@
+/*
+ * unbted - Una's NBT Editor
+ * Copyright (C) 2018 Una Thompson (unascribed)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.unascribed.nbted;
 
 import java.io.PrintStream;
 import java.io.StringWriter;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
 import com.google.gson.Gson;
@@ -18,23 +35,17 @@ import com.google.gson.stream.JsonWriter;
 import com.unascribed.miniansi.AnsiCode;
 import com.unascribed.miniansi.AnsiStream;
 
-import io.github.steveice10.opennbt.tag.builtin.ByteArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.ByteTag;
-import io.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import io.github.steveice10.opennbt.tag.builtin.DoubleTag;
-import io.github.steveice10.opennbt.tag.builtin.FloatTag;
-import io.github.steveice10.opennbt.tag.builtin.IntArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.IntTag;
-import io.github.steveice10.opennbt.tag.builtin.ListTag;
-import io.github.steveice10.opennbt.tag.builtin.LongArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.LongTag;
-import io.github.steveice10.opennbt.tag.builtin.ShortTag;
-import io.github.steveice10.opennbt.tag.builtin.StringTag;
-import io.github.steveice10.opennbt.tag.builtin.Tag;
-import io.github.steveice10.opennbt.tag.builtin.custom.DoubleArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.custom.FloatArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.custom.ShortArrayTag;
-import io.github.steveice10.opennbt.tag.builtin.custom.StringArrayTag;
+import io.github.steveice10.opennbt.NBTRegistry;
+import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTList;
+import io.github.steveice10.opennbt.tag.NBTString;
+import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.NBTByteArray;
+import io.github.steveice10.opennbt.tag.array.NBTIntArray;
+import io.github.steveice10.opennbt.tag.array.NBTLongArray;
+import io.github.steveice10.opennbt.tag.number.NBTByte;
+import io.github.steveice10.opennbt.tag.number.NBTLong;
+import io.github.steveice10.opennbt.tag.number.NBTNumber;
 
 public class TagPrinter {
 	
@@ -122,41 +133,39 @@ public class TagPrinter {
 
 	
 	private final AnsiStream aout;
-	private final Function<byte[], String> byteArrayFormatter;
 	
 	private final Gson gson = new Gson();
 	
-	public TagPrinter(PrintStream out, Function<byte[], String> byteArrayFormatter) {
-		this(new AnsiStream(out), byteArrayFormatter);
+	public TagPrinter(PrintStream out) {
+		this(new AnsiStream(out));
 	}
 	
-	public TagPrinter(AnsiStream out, Function<byte[], String> byteArrayFormatter) {
+	public TagPrinter(AnsiStream out) {
 		this.aout = out;
-		this.byteArrayFormatter = byteArrayFormatter;
 	}
 	
-	public void printTag(Tag tag) {
+	public void printTag(NBTTag tag) {
 		printTag(tag, "");
 	}
 	
-	public void printTag(Tag tag, String prefix) {
+	public void printTag(NBTTag tag, String prefix) {
 		printTag(tag, prefix, NBTEd.INFER);
 	}
 	
-	public void printTag(Tag tag, String prefix, boolean infer) {
+	public void printTag(NBTTag tag, String prefix, boolean infer) {
 		printTag(tag, prefix, infer, RecurseMode.FULL);
 	}
 	
-	public void printTag(Tag tag, String prefix, boolean infer, RecurseMode recurse) {
+	public void printTag(NBTTag tag, String prefix, boolean infer, RecurseMode recurse) {
 		printTag(tag, prefix, infer, recurse, true);
 	}
 	
-	public void printTag(Tag tag, String prefix, boolean infer, RecurseMode recurse, boolean values) {
+	public void printTag(NBTTag tag, String prefix, boolean infer, RecurseMode recurse, boolean values) {
 		if (tag == null) {
 			return;
 		}
-		if (tag instanceof CompoundTag) {
-			CompoundTag ct = (CompoundTag)tag;
+		if (tag instanceof NBTCompound) {
+			NBTCompound ct = (NBTCompound)tag;
 			if (recurse.shouldPrintRoot()) {
 				aout.print(prefix);
 				aout.print("compound ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
@@ -164,26 +173,26 @@ public class TagPrinter {
 			}
 			if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 				if (recurse.shouldPrintChildren()) {
-					if (ct.getValue().isEmpty()) {
+					if (ct.isEmpty()) {
 						if (recurse.shouldPrintRoot()) aout.println(" {}", AnsiCode.RESET);
 					} else {
 						if (recurse.shouldPrintRoot()) aout.println(" {", AnsiCode.RESET);
 						String childPrefix = recurse.shouldPrintRoot() ? prefix+"  " : prefix;
-						for (Tag t : ct.getValue().values()) {
+						for (NBTTag t : ct) {
 							if (infer) {
 								if (t.getName().endsWith("Most") && ct.contains(t.getName().replaceFirst("Most$", "Least"))) {
-									Tag most = t;
-									Tag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
-									if (most instanceof LongTag && least instanceof LongTag) {
-										UUID u = new UUID((long)most.getValue(), (long)least.getValue());
-										printBasic(u, t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix);
+									NBTTag most = t;
+									NBTTag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
+									if (most instanceof NBTLong && least instanceof NBTLong) {
+										UUID u = new UUID(((NBTLong)most).longValue(), ((NBTLong)least).longValue());
+										printBasic(u.toString(), t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix, values);
 										continue;
 									}
 								}
 								if (t.getName().endsWith("Least") && ct.contains(t.getName().replaceFirst("Least$", "Most"))) {
-									Tag most = ct.get(t.getName().replaceFirst("Least$", "Most"));
-									Tag least = t;
-									if (most instanceof LongTag && least instanceof LongTag) {
+									NBTTag most = ct.get(t.getName().replaceFirst("Least$", "Most"));
+									NBTTag least = t;
+									if (most instanceof NBTLong && least instanceof NBTLong) {
 										continue;
 									}
 								}
@@ -207,9 +216,9 @@ public class TagPrinter {
 			} else {
 				aout.println(AnsiCode.RESET);
 			}
-		} else if (tag instanceof ListTag) {
-			ListTag lt = (ListTag)tag;
-			if (lt.getValue().isEmpty()) {
+		} else if (tag instanceof NBTList) {
+			NBTList lt = (NBTList)tag;
+			if (lt.isEmpty()) {
 				if (recurse.shouldPrintRoot()) {
 					aout.print(prefix);
 					aout.print("list ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
@@ -229,10 +238,10 @@ public class TagPrinter {
 				if (recurse.shouldPrintChildren() && values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 					Class<?> registryType = null;
 					if (infer) {
-						for (Tag t : lt.getValue()) {
-							if (t instanceof CompoundTag) {
-								CompoundTag ct = (CompoundTag)t;
-								if (ct.size() == 2 && ct.contains("K") && ct.contains("V") && ct.get("V").getValue() instanceof Comparable) {
+						for (NBTTag t : lt) {
+							if (t instanceof NBTCompound) {
+								NBTCompound ct = (NBTCompound)t;
+								if (ct.size() == 2 && ct.contains("K") && ct.contains("V") && ct.get("V") instanceof Comparable) {
 									if (registryType == null) {
 										registryType = ct.get("V").getClass();
 										continue;
@@ -259,21 +268,21 @@ public class TagPrinter {
 					}
 					// these assumptions are safe due to the checks above that set the forgeRegistry flag
 					@SuppressWarnings({"unchecked", "rawtypes"})
-					List<CompoundTag> copy = (List)lt.getValue();
-					copy.sort(new Comparator<CompoundTag>() {
+					List<NBTCompound> copy = (List)Lists.newArrayList(lt);
+					copy.sort(new Comparator<NBTCompound>() {
 						@Override
 						@SuppressWarnings({"unchecked", "rawtypes"})
-						public int compare(CompoundTag a, CompoundTag b) {
-							return ((Comparable)a.get("V").getValue()).compareTo(b.get("V").getValue());
+						public int compare(NBTCompound a, NBTCompound b) {
+							return ((Comparable)a.get("V")).compareTo(b.get("V"));
 						}
 					});
-					for (Tag t : copy) {
-						CompoundTag ct = (CompoundTag)t;
+					for (NBTTag t : copy) {
+						NBTCompound ct = (NBTCompound)t;
 						if (ct.size() == 2 && ct.contains("K") && ct.contains("V")) {
 							aout.print(prefix);
 							if (recurse.shouldPrintRoot()) aout.print("  ");
-							printName(ct.get("K").getValue().toString(), true);
-							printVal(ct.get("V").getValue());
+							printName(ct.get("K").stringValue(), true);
+							printVal(ct.get("V").stringValue());
 							continue;
 						}
 					}
@@ -290,7 +299,7 @@ public class TagPrinter {
 					if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 						if (recurse.shouldPrintChildren()) {
 							if (recurse.shouldPrintRoot()) aout.println(" [", AnsiCode.RESET);
-							for (Tag t : lt) {
+							for (NBTTag t : lt) {
 								printTag(t, recurse.shouldPrintRoot() ? prefix+"  " : prefix, infer, recurse, values);
 							}
 							if (recurse.shouldPrintRoot()) {
@@ -311,8 +320,8 @@ public class TagPrinter {
 					}
 				}
 			}
-		} else if (tag instanceof ByteTag) {
-			if (infer && (byte)tag.getValue() == 0 || (byte)tag.getValue() == 1) {
+		} else if (tag instanceof NBTByte) {
+			if (infer && ((NBTByte)tag).byteValue() == 0 || ((NBTByte)tag).byteValue() == 1) {
 				String lowerName = tag.getName().toLowerCase(Locale.ROOT);
 				boolean maybeBoolean = false;
 				if (knownBooleanNames.contains(lowerName)) {
@@ -334,24 +343,16 @@ public class TagPrinter {
 					}
 				}
 				if (maybeBoolean) {
-					printBasic(values ? (byte)tag.getValue() != 0 : null, tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix);
+					printBasic(Boolean.toString(((NBTByte)tag).booleanValue()), tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix, values);
 					return;
 				}
 			}
-			printBasic(tag, "byte", AnsiCode.FG_YELLOW, prefix, values);
-		} else if (tag instanceof ShortTag) {
-			printBasic(tag, "short", AnsiCode.FG_YELLOW, prefix, values);
-		} else if (tag instanceof IntTag) {
-			printBasic(tag, "int", AnsiCode.FG_YELLOW, prefix, values);
-		} else if (tag instanceof LongTag) {
-			printBasic(tag, "long", AnsiCode.FG_YELLOW, prefix, values);
-		} else if (tag instanceof FloatTag) {
-			printBasic(tag, "float", AnsiCode.FG_MAGENTA, prefix, values);
-		} else if (tag instanceof DoubleTag) {
-			printBasic(tag, "double", AnsiCode.FG_MAGENTA, prefix, values);
-		} else if (tag instanceof StringTag) {
+			printBasic(tag.stringValue(), tag.getName(), "byte", AnsiCode.FG_YELLOW, prefix, values);
+		} else if (tag instanceof NBTNumber) {
+			printBasic(tag.stringValue(), tag.getName(), NBTRegistry.typeNameFromClass(tag.getClass()), AnsiCode.FG_YELLOW, prefix, values);
+		} else if (tag instanceof NBTString) {
 			if (infer) {
-				String str = (String)tag.getValue();
+				String str = tag.stringValue();
 				if (str.startsWith("{") || str.startsWith("[")) {
 					try {
 						JsonElement je = gson.fromJson(str, JsonElement.class);
@@ -362,83 +363,48 @@ public class TagPrinter {
 							jw.setLenient(true);
 							gson.toJson(je, jw);
 							String jstr = sw.toString()
-									.replaceAll("[\\]\\[]", AnsiCode.RESET+"$1")
+									.replaceAll("[\\]\\[]", AnsiCode.RESET+"$0")
 									.replace("\n", "\n"+prefix+"  "+AnsiCode.FG_BLUE_INTENSE)
 									.replace(":", AnsiCode.RESET+":"+AnsiCode.FG_GREEN)
 									.replace(",", AnsiCode.RESET+",")
 									.replace("{", AnsiCode.RESET+"{")
 									.replace("}", AnsiCode.RESET+"}")
 									;
-							printBasic(recurse.shouldPrintChildren() ? jstr : "...", tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix);
+							printBasic(recurse.shouldPrintChildren() ? jstr : "...", tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
 						} else {
-							printBasic(null, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix);
+							printBasic(null, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
 						}
 						return;
 					} catch (Exception e) {}
 				}
 			}
-			printBasic(tag, "string", AnsiCode.FG_RED, prefix, values);
-		} else if (tag instanceof ByteArrayTag) {
-			printBasic(tag, "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
-		} else if (tag instanceof IntArrayTag) {
-			printBasic(tag, "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
-		} else if (tag instanceof LongArrayTag) {
-			printBasic(tag, "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
-		} else if (tag instanceof StringArrayTag) {
-			printBasic(tag, "!string[]", AnsiCode.FG_RED_INTENSE, prefix, values);
-		} else if (tag instanceof ShortArrayTag) {
-			printBasic(tag, "!short[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
-		} else if (tag instanceof FloatArrayTag) {
-			printBasic(tag, "!float[]", AnsiCode.FG_MAGENTA_INTENSE, prefix, values);
-		} else if (tag instanceof DoubleArrayTag) {
-			printBasic(tag, "!double[]", AnsiCode.FG_MAGENTA_INTENSE, prefix, values);
+			printBasic(tag.stringValue(), tag.getName(), "string", AnsiCode.FG_RED, prefix, values);
+		} else if (tag instanceof NBTByteArray) {
+			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+		} else if (tag instanceof NBTIntArray) {
+			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+		} else if (tag instanceof NBTLongArray) {
+			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		}
 	}
 	
-	public void printBasic(Tag tag, String type, AnsiCode color, String prefix, boolean value) {
-		Object val = value ? tag.getValue() : null;
-		if (val instanceof String) {
-			val = "\""+escaper.escape((String)val)+"\"";
-		}
-		printBasic(val, tag.getName(), type, color, prefix);
+	private String colorizeArray(String str) {
+		return str
+				.replaceAll("[\\]\\[]", AnsiCode.RESET+"$0"+AnsiCode.FG_GREEN)
+				.replace(",", AnsiCode.RESET+","+AnsiCode.FG_GREEN);
 	}
 
-	public void printBasic(Object val, String name, String type, AnsiCode color, String prefix) {
+	public void printBasic(String val, String name, String type, AnsiCode color, String prefix, boolean values) {
 		aout.print(prefix);
 		aout.print(type, color);
 		aout.print(" ");
-		printName(name, val != null);
-		printVal(val);
+		printName(name, values);
+		if (values) printVal(val);
 	}
 
-	public void printVal(Object val) {
+	public void printVal(String val) {
 		aout.print(AnsiCode.FG_GREEN);
-		if (val instanceof byte[]) {
-			byte[] bys = (byte[])val;
-			String str = byteArrayFormatter.apply(bys);
-			if (NBTEd.TRUNCATE && str.length() > 32) {
-				aout.print(str.substring(0, 33));
-				aout.print("... (");
-				aout.print(str.length()-32);
-				aout.print(" more)");
-			} else {
-				aout.print(str);
-			}
-		} else if (val instanceof short[]) {
-			aout.print(Arrays.toString((short[])val));
-		} else if (val instanceof int[]) {
-			aout.print(Arrays.toString((int[])val));
-		} else if (val instanceof long[]) {
-			aout.print(Arrays.toString((long[])val));
-		} else if (val instanceof float[]) {
-			aout.print(Arrays.toString((float[])val));
-		} else if (val instanceof double[]) {
-			aout.print(Arrays.toString((double[])val));
-		} else if (val instanceof Object[]) {
-			aout.print(Arrays.toString((Object[])val));
-		} else if (val != null) {
-			aout.print(val);
-		}
+		aout.print(val);
 		aout.println(AnsiCode.RESET);
 	}
 

@@ -1,8 +1,7 @@
 Una's NBT Editor
 
 Type names prefixed with a ~ indicate inferred types, such as JSON
-strings or UUID long pairs. Type names prefixed with a ! indicate
-nonstandard OpenNBT extensions.
+strings or UUID long pairs.
 
 Arguments in <angle brackets> represent required arguments.
 [Square brackets] indicate optional arguments. Arguments followed by
@@ -12,23 +11,31 @@ A yellow * will be displayed before the prompt if the file has been
 modified.
 
 help, h, ?
-	No arguments
-	Display this help
+	No arguments.
+	
+	Display this help.
+	
+	No options.
 
 cd
 	Arguments: <path>
+	
 	Change the command context to the given named compound child of the
 	current compound, similar to a change-directory command in a
 	filesystem. Multiple levels can be traversed by separating compound
 	names with a forward slash. With no arguments, jumps to the root of
 	the file.
+	
+	No options.
 
 ls, dir
-	Arguments: [path]
+	Arguments: [path]...
+	
 	Print out the contents of the current command context, or a child
 	specified by a path like one that would be given to cd. By default,
 	only prints immediate children.
-	Switches:
+	
+	Options:
 	-R, --recursive
 		Print all descendants recursively, instead of only immediate
 		children.
@@ -37,62 +44,116 @@ ls, dir
 		Overshadows -R.
 	-r, --raw
 		Don't infer types.
-	-l, --long
-		Print values.
-	-1, -a, -A
+	-l, -1, -a, -A
 		Ignored. Recognized to avoid mistakes from habit.
 
 rm, del, rmdir, rd
 	Arguments: <path>...
+	
 	Delete the given tag(s). If a tag is a compound and is not empty,
 	print an error and do nothing.
-	Switches:
+	
+	Options:
 	-r, --recursive
 		Also delete nonempty compounds.
 	-f, --force
 		Ignore errors and attempt to remove every item listed.
 
+mkdir
+	Arguments: <path>...
+	
+	Create new empty compounds at the given paths. Parent compounds will
+	be created automatically. Does nothing if a compound already exists
+	at the given path. Errors if a non-compound already exists at the
+	given path.
+	
+	No options.
+
+set, put, create, new
+	Arguments: <path> [data]
+	
+	Set a value at the given path, replacing existing values. Parent
+	compounds will be created automatically. Appending a number in
+	square brackets to the path will set values within a list or array.
+	
+	Type is required if the value does not already exist.
+	
+	Options:
+	--type=<type>, --<type>
+		Specifies the type of value that will be set. Required if the
+		type cannot be inferred, such as when setting an initial value
+		in a list or when creating a new tag.
+		Valid types: byte, short, int, long, float, double, string
+		If no data is specified, additional types are: compound, list,
+			byte-array, int-array, long-array
+	--no-overwrite
+		Throw an error when attempting to overwrite. Implied if the
+		command is invoked as create or new.
+
+append, add
+	Arguments: <path> <data>
+	
+	Append a value to the end of an array or list at the given path.
+	Data type is inferred from the type of the array or the type of the
+	existing contents of the list. Empty lists must first be initialized
+	by using set with an index of 0.
+	
+	No options.
+
 exit, abort
 	No arguments.
+	
 	Exit unbted, without saving changes. You will be asked to confirm
 	if there are unsaved changes.
-	Switches:
+	
+	Options:
 	-f, --force
 		Don't ask to confirm when there are unsaved changes. Implied if
 		the command is invoked as abort.
 
 save
 	Arguments: [file]
+	
 	Save changes to the given file, or the file that was originally
 	loaded. If a file was not loaded, the file argument is required.
 	This is true when loading from stdin or when creating a new empty
 	file.
-	Switches:
-		-c=<method>, --compression=<method>
-			Override the compression method used. Valid values are None,
-			Deflate, and GZip. GZip is the most common. Required on new
-			empty files. Otherwise, defaults to the compression that
-			was used when the file was loaded.
-		--endian=<endianness>, --little-endian, --big-endian
-			Write a <endianness>-endian file instead of the default.
-			See the program help for more information about why unbted
-			supports little-endian NBT.
-			Valid endiannesses are Big and Little. (case-insensitive)
-		-d, --default
-			Update the default file, compression method, and endianness
-			to those specified.
+	
+	Options:
+	-c=<method>, --compression=<method>
+		Override the compression method used. Valid values are None,
+		Deflate, and GZip. GZip is the most common. Required on new
+		empty files. Otherwise, defaults to the compression that
+		was used when the file was loaded.
+	--endian=<endianness>
+		Write a <endianness>-endian file instead of the default.
+		See the program help for more information about why unbted
+		supports little-endian NBT.
+		Valid endiannesses are Big and Little. (case-insensitive)
+	--little-endian
+		Alias for --endian=little
+	--big-endian
+		Alias for --endian=big
+	-d, --default
+		Update the default file, compression method, and endianness
+		to those specified.
 
 info
 	No arguments.
+	
 	Print information about the loaded file, such as its
 	compression algorithm, root tag name, total size, etc.
+	
+	Options:
 	-s, --si
 		Use SI units (1000) instead of binary units (1024)
 
 echo
 	Arguments: [anything]...
+	
 	Print arguments.
-	Switches:
+	
+	Options:
 	-e
 		Parse escapes. The following escapes are recognized:
 			\\ backslash
@@ -118,13 +179,22 @@ echo
 
 rem, remark, comment, #, //
 	Arguments: [anything]...
+	
 	Do nothing, ignore all arguments.
+	
+	No options.
 
 copying
 	No arguments.
+	
 	Display the text of the GNU General Public License version 3.
+	
+	No options.
 
 warranty
 	No arguments.
+	
 	Display the warranty sections of the GNU General Public License
 	version 3.
+	
+	No options.
