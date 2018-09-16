@@ -71,7 +71,7 @@ public class Command {
 		try {
 			set = parser.parse(args);
 		} catch (OptionException e) {
-			throw new CommandException(e.getMessage());
+			throw new CommandException(CommandException.VALUE_BAD_USAGE, e.getMessage());
 		}
 		execute(alias, set);
 	}

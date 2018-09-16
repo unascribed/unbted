@@ -8,5 +8,6 @@ public abstract class NBTParent extends NBTTag implements Iterable<NBTTag> {
 	
 	public abstract boolean remove(NBTTag tag);
 	public abstract int size();
+	public abstract boolean isEmpty();
 	
 }

@@ -24,8 +24,6 @@ package io.github.steveice10.opennbt;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 
 import com.google.common.collect.BiMap;
@@ -99,6 +97,10 @@ public class NBTRegistry {
 		return byId.inverse().get(clazz);
 	}
 	
+	public static BiMap<Integer, Class<? extends NBTTag>> allById() {
+		return Maps.unmodifiableBiMap(byId);
+	}
+	
 	/**
 	 * @return The tag class with the given type name, or null if it cannot be found.
 	 */
@@ -115,8 +117,8 @@ public class NBTRegistry {
 		return byTypeName.inverse().get(clazz);
 	}
 	
-	public static Collection<String> allTypeNames() {
-		return Collections.unmodifiableCollection(byTypeName.keySet());
+	public static BiMap<String, Class<? extends NBTTag>> allByTypeName() {
+		return Maps.unmodifiableBiMap(byTypeName);
 	}
 
 	/**
@@ -130,7 +132,10 @@ public class NBTRegistry {
 	public static NBTTag createInstance(int id, String tagName) throws IOException {
 		Class<? extends NBTTag> clazz = classById(id);
 		if (clazz == null) throw new IOException("Could not find tag with ID "+id);
-
+		return createInstance(clazz, tagName);
+	}
+	
+	public static NBTTag createInstance(Class<? extends NBTTag> clazz, String tagName) throws IOException {
 		try {
 			return constructors.get(clazz).newInstance(tagName);
 		} catch (Throwable e) {

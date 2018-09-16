@@ -20,20 +20,87 @@ package com.unascribed.nbted;
 
 public class CommandException extends RuntimeException {
 
-	public CommandException() {
-		super();
-	}
-
-	public CommandException(String message, Throwable cause) {
+	// "Exit codes" for use by scripts, if those ever get implemented.
+	// Not exposed in the UI at the time of writing.
+	
+	/**
+	 * The command succeeded. Do not use. This is implied by no
+	 * exception being thrown.
+	 */
+	@Deprecated
+	public static final int VALUE_SUCCESS = 0;
+	/**
+	 * A non-specific error occurred.
+	 */
+	public static final int VALUE_GENERAL_ERROR = 1;
+	/**
+	 * The argument syntax was wrong. No possible change in environment
+	 * would cause this command to succeed.
+	 */
+	public static final int VALUE_BAD_USAGE = 2;
+	/**
+	 * A tag specified in an argument or option was not found.
+	 */
+	public static final int VALUE_TAG_NOT_FOUND = 3;
+	/**
+	 * A tag specified in an argument or option already existed, and the
+	 * command as invoked is refusing to destructively overwrite this
+	 * tag.
+	 */
+	public static final int VALUE_WONT_OVERWRITE = 4;
+	
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_1 = 20;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_2 = 21;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_3 = 22;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_4 = 23;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_5 = 24;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_6 = 25;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_7 = 26;
+	/**
+	 * Command-specific error.
+	 */
+	public static final int VALUE_CMDSPECIFIC_8 = 27;
+	
+	/**
+	 * A required feature has not yet been implemented.
+	 */
+	public static final int VALUE_NYI = 125;
+	
+	private final int value;
+	
+	public CommandException(int value, String message, Throwable cause) {
 		super(message, cause);
+		this.value = value;
 	}
 
-	public CommandException(String message) {
+	public CommandException(int value, String message) {
 		super(message);
+		this.value = value;
 	}
-
-	public CommandException(Throwable cause) {
-		super(cause);
+	
+	public int getValue() {
+		return value;
 	}
 
 }

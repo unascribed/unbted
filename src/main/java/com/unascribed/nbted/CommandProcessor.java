@@ -55,17 +55,31 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CountingOutputStream;
+import com.google.common.primitives.Ints;
 import com.unascribed.miniansi.AnsiCode;
 import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
 import io.github.steveice10.opennbt.NBTRegistry;
 import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTList;
+import io.github.steveice10.opennbt.tag.NBTParent;
+import io.github.steveice10.opennbt.tag.NBTString;
 import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.number.NBTByte;
+import io.github.steveice10.opennbt.tag.number.NBTDouble;
+import io.github.steveice10.opennbt.tag.number.NBTFloat;
+import io.github.steveice10.opennbt.tag.number.NBTInt;
+import io.github.steveice10.opennbt.tag.number.NBTLong;
+import io.github.steveice10.opennbt.tag.number.NBTNumber;
+import io.github.steveice10.opennbt.tag.number.NBTShort;
 import joptsimple.OptionDescriptor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSpec;
 import joptsimple.OptionSpecBuilder;
+
+import static com.unascribed.nbted.CommandException.*;
+import static com.unascribed.nbted.ResolvePathOption.*;
 
 public class CommandProcessor implements Completer, Highlighter {
 	
@@ -73,12 +87,15 @@ public class CommandProcessor implements Completer, Highlighter {
 	private static final NumberFormat TWO_FRAC_FMT = new DecimalFormat("#,##0.00");
 	
 	private static final Joiner SLASH_JOINER = Joiner.on('/');
-	private static final Splitter SLASH_SPLITTER = Splitter.on('/');
+	private static final Splitter SLASH_SPLITTER_WITHEMPTY = Splitter.on('/');
+	private static final Splitter SLASH_SPLITTER = Splitter.on('/').omitEmptyStrings();
 	
 	private static final Joiner SPACE_JOINER = Joiner.on(' ');
 	private static final Joiner NONE_JOINER = Joiner.on("");
 	
 	private static final Pattern ECHO_ESCAPE = Pattern.compile("(?:\\\\0([0-7]{1,3})|\\\\x([0-9a-fA-F]{1,2})|\\\\u([0-9a-fA-F]{1,4})|\\\\U([0-9a-fA-F]{1,8}))");
+	
+	private static final Pattern PATH_SEGMENT = Pattern.compile("(?:^|\\/|\\[)(.*?)(?:$|\\/|\\])");
 	
 	private boolean running = false;
 	
@@ -195,7 +212,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				if (args.isEmpty()) {
 					cursor = root;
 				} else {
-					cursor = resolvePath(args.get(0), true, true);
+					cursor = resolvePath(args.get(0), PARENTS_ONLY).leaf;
 				}
 			}));
 		addCommand(Command.create()
@@ -218,7 +235,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				if (args.isEmpty()) {
 					tags = Collections.singleton(cursor);
 				} else {
-					tags = Iterables.transform(args, s -> resolvePath(s, true, false));
+					tags = Iterables.transform(args, s -> resolvePath(s).leaf);
 				}
 				for (NBTTag tag : tags) {
 					if (set.has("directory")) {
@@ -250,14 +267,11 @@ public class CommandProcessor implements Completer, Highlighter {
 				}
 				for (String s : args) {
 					try {
-						NBTTag t = resolvePath(s, set.has("force"), false);
-						if (t == null) {
-							throw new CommandException("No such tag with path "+s);
-						}
+						NBTTag t = resolvePath(s).leaf;
 						if (t instanceof NBTCompound) {
 							NBTCompound ct = (NBTCompound)t;
 							if (!ct.isEmpty() && !set.has("recursive")) {
-								throw new CommandException("Refusing to delete non-empty compound "+getPath(t)+" - add -r to override");
+								throw new CommandException(VALUE_CMDSPECIFIC_1, "Refusing to delete non-empty compound "+getPath(t)+" - add -r to override");
 							}
 						}
 						NBTTag parent = t.getParent();
@@ -280,7 +294,7 @@ public class CommandProcessor implements Completer, Highlighter {
 									throw new ConsistencyError("Tried to delete tag from parent, but it's not in its parent!?");
 								}
 							} else {
-								throw new CommandException("Tried to delete tag with non-compound parent (NYI)");
+								throw new CommandException(VALUE_NYI, "Tried to delete tag with non-compound parent (NYI)");
 							}
 						}
 						int idx = contextParents.indexOf(t);
@@ -410,7 +424,7 @@ public class CommandProcessor implements Completer, Highlighter {
 			.action((set, args) -> {
 				if (args.size() > 1) throw new CommandUsageException("Too many arguments");
 				if (root == null) {
-					throw new CommandException("Nothing to write");
+					throw new CommandException(VALUE_TAG_NOT_FOUND, "Nothing to write");
 				}
 				Endianness endianness;
 				if (set.has("endian")) {
@@ -432,7 +446,7 @@ public class CommandProcessor implements Completer, Highlighter {
 					compressionAutodetected = fileInfo.compressionAutodetected;
 				}
 				if (compression == null) {
-					throw new CommandException("No compression format specified, please specify one with -c");
+					throw new CommandException(VALUE_CMDSPECIFIC_1, "No compression format specified, please specify one with -c");
 				}
 				File outFile;
 				if (fileInfo.sourceFile == FileInfo.STDIN) {
@@ -449,11 +463,14 @@ public class CommandProcessor implements Completer, Highlighter {
 					}
 				}
 				if (outFile == null) {
-					throw new CommandException("No file specified");
+					throw new CommandException(VALUE_CMDSPECIFIC_2, "No file specified");
 				}
 				try {
 					DataOutput out = endianness.wrap(compression.wrap(new FileOutputStream(outFile)));
 					try (Closeable c = (Closeable)out) {
+						if (!(root instanceof NBTCompound)) {
+							System.err.println("unbted: save: warning: NBT files with non-compound roots are nonstandard and may not be supported by other programs");
+						}
 						NBTIO.writeTag(out, root);
 						if (outFile == fileInfo.sourceFile || set.has("default")) {
 							fileInfo = new FileInfo(outFile, compression, compressionAutodetected, endianness);
@@ -463,7 +480,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				} catch (Exception e) {
 					NBTEd.log("Error occurred while writing", e);
 					// TODO detect common exceptions and print useful messages
-					throw new CommandException("An error occurred while writing");
+					throw new CommandException(VALUE_GENERAL_ERROR, "An error occurred while writing");
 				}
 			}));
 		addCommand(Command.create()
@@ -474,24 +491,24 @@ public class CommandProcessor implements Completer, Highlighter {
 			.action((set, args) -> {
 				if (args.isEmpty()) throw new CommandUsageException("Missing argument");
 				for (String s : args) {
-					NBTTag tag = resolvePath(s, false, false);
+					NBTTag tag = resolvePath(s).leaf;
 					if (tag == null) {
 						commands.get("set").execute("set", "--type=compound", s);
 					} else if (!(tag instanceof NBTCompound)) {
-						throw new CommandException(s+" already exists and is not a compound");
+						throw new CommandException(VALUE_WONT_OVERWRITE, s+" already exists and is not a compound");
 					}
 				}
 			}));
 		addCommand(Command.create()
 			.name("set").aliases("put", "new", "create")
 			.description("write values")
-			.usage("{} <path> [data]")
+			.usage("{} <path> [data]...")
 			.completer(pathCompleter(false))
 			.options((parser) -> {
 				parser.accepts("no-overwrite", "error when attempting to overwrite");
 				parser.accepts("type", "type of value to set").withRequiredArg();
-				List<OptionSpecBuilder> exclusive = Lists.newArrayListWithCapacity(NBTRegistry.allTypeNames().size());
-				for (String s : NBTRegistry.allTypeNames()) {
+				List<OptionSpecBuilder> exclusive = Lists.newArrayListWithCapacity(NBTRegistry.allByTypeName().size());
+				for (String s : NBTRegistry.allByTypeName().keySet()) {
 					exclusive.add(parser.accepts(s, "equivalent to --type="+s).availableUnless("type"));
 				}
 				parser.mutuallyExclusive(exclusive.toArray(new OptionSpecBuilder[exclusive.size()]));
@@ -500,10 +517,98 @@ public class CommandProcessor implements Completer, Highlighter {
 				if (args.isEmpty()) throw new CommandUsageException("Not enough arguments");
 				boolean noOverwrite = set.has("no-overwrite");
 				if ("create".equals(alias) || "new".equals(alias)) noOverwrite = true;
+				String path = sanitizePath(args.get(0));
+				Class<? extends NBTTag> explicitType = null;
+				if (set.has("type")) {
+					explicitType = NBTRegistry.classByTypeName(set.valueOf("type").toString());
+					if (explicitType == null) throw new CommandException(VALUE_BAD_USAGE, "Unrecognized type "+set.valueOf("type"));
+				} else {
+					for (Map.Entry<String, Class<? extends NBTTag>> en : NBTRegistry.allByTypeName().entrySet()) {
+						if (set.has(en.getKey())) {
+							explicitType = en.getValue();
+							break;
+						}
+					}
+				}
+				NBTTag cursorWork = cursor;
+				if (path.startsWith("/")) {
+					cursorWork = root;
+				}
+				List<String> parts = Lists.newArrayList(SLASH_SPLITTER.split(path));
 				// TODO
+				String finalSegment = parts.get(parts.size()-1);
+				if (cursorWork instanceof NBTCompound) {
+					String str = SPACE_JOINER.join(args.subList(1, args.size()));
+					NBTCompound c = (NBTCompound)cursorWork;
+					if (c.contains(finalSegment)) {
+						NBTTag existing = c.get(finalSegment);
+						if (noOverwrite) {
+							throw new CommandException(VALUE_WONT_OVERWRITE, "Refusing to overwrite existing tag");
+						}
+						if (explicitType != null && explicitType != existing.getClass()) {
+							throw new CommandException(VALUE_CMDSPECIFIC_1, "Explicit type "+NBTRegistry.typeNameFromClass(explicitType)+" is incompatible with existing type "+NBTRegistry.typeNameFromClass(existing.getClass()));
+						}
+						try {
+							parseAndSet(existing, str);
+							dirty = true;
+						} catch (NumberFormatException e) {
+							throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
+						}
+					} else {
+						if (explicitType == null) {
+							throw new CommandException(VALUE_CMDSPECIFIC_3, "An explicit type must be specified to create new tags");
+						}
+						NBTTag tag = NBTRegistry.createInstance(explicitType, finalSegment);
+						try {
+							parseAndSet(tag, str);
+						} catch (NumberFormatException e) {
+							throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
+						}
+						c.put(tag);
+						dirty = true;
+					}
+				} else {
+					throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse into non-compound "+cursorWork.getName());
+				}
 			}));
 	}
 	
+	private void parseAndSet(NBTTag tag, String str) {
+		if (tag instanceof NBTNumber) {
+			if ("true".equals(str)) {
+				str = "1";
+			} else if ("false".equals(str)) {
+				str = "0";
+			}
+		}
+		if (tag instanceof NBTByte) {
+			((NBTByte)tag).setValue(Byte.decode(str.trim()));
+		} else if (tag instanceof NBTShort) {
+			((NBTShort)tag).setValue(Short.decode(str.trim()));
+		} else if (tag instanceof NBTInt) {
+			((NBTInt)tag).setValue(Integer.decode(str.trim()));
+		} else if (tag instanceof NBTLong) {
+			((NBTLong)tag).setValue(Long.decode(str.trim()));
+		} else if (tag instanceof NBTFloat) {
+			((NBTFloat)tag).setValue(Float.parseFloat(str));
+		} else if (tag instanceof NBTDouble) {
+			((NBTDouble)tag).setValue(Double.parseDouble(str));
+		} else if (tag instanceof NBTString) {
+			((NBTString)tag).setValue(str);
+		} else if (!str.trim().isEmpty()) {
+			throw new CommandException(VALUE_BAD_USAGE, "Tags of type "+NBTRegistry.typeNameFromClass(tag.getClass())+" cannot be created with a value");
+		}
+	}
+	
+	public static final Pattern DUPLICATE_SLASH_PATTERN = Pattern.compile("/+");
+	
+	private static String sanitizePath(String path) {
+		path = DUPLICATE_SLASH_PATTERN.matcher(path).replaceAll("/");
+		if (path.endsWith("/")) path = path.substring(0, path.length()-1);
+		return path;
+	}
+
+
 	private static String humanReadableBytes(long bytes, boolean si) {
 		String c = si ? "" : "i";
 		double divisor = si ? 1000 : 1024;
@@ -535,86 +640,96 @@ public class CommandProcessor implements Completer, Highlighter {
 		}
 	}
 
-	private Completer pathCompleter(boolean compoundOnly) {
+	private Completer pathCompleter(boolean parentOnly) {
 		return (reader, line, candidates) -> {
 			if (line.word().startsWith("-") && line.wordIndex() < line.words().indexOf("--")) return;
-			if (cursor instanceof NBTCompound) {
-				String word = line.word();
-				int cur = line.wordCursor();
-				NBTTag tag = cursor;
-				String left = word.substring(0, cur);
-				String prefix = "";
-				if (left.contains("/")) {
-					List<String> split = SLASH_SPLITTER.splitToList(left);
-					for (int i = 0; i < split.size()-1; i++) {
-						String s = split.get(i);
-						if (tag instanceof NBTCompound && ((NBTCompound)tag).contains(s)) {
-							prefix += s+"/";
-							tag = ((NBTCompound)tag).get(s);
-						} else {
-							return;
-						}
+			ResolvedPath p = resolvePath(line.word(), NO_ERROR, parentOnly ? PARENTS_ONLY : null);
+			NBTParent subject;
+			if (p.leaf != null && p.leaf instanceof NBTParent) {
+				subject = (NBTParent)p.leaf;
+			} else {
+				subject = p.immediateParent;
+			}
+			if (subject != null) {
+				if (subject instanceof NBTCompound) {
+					for (NBTTag tag : subject) {
+						String suffix = tag instanceof NBTCompound ? "/" : "";
+						String str = p.parentPath+"/"+tag.getName()+suffix;
+						candidates.add(new Candidate(str, str, null, null, suffix, null, !(tag instanceof NBTParent)));
 					}
-					left = split.get(split.size()-1);
-				}
-				if (tag instanceof NBTCompound) {
-					for (NBTTag t : ((NBTCompound)tag).values()) {
-						if (!compoundOnly || t instanceof NBTCompound) {
-							boolean leaf = !(t instanceof NBTCompound) || ((NBTCompound)t).isEmpty();
-							String suff = leaf ? "" : "/";
-							candidates.add(new Candidate(prefix+t.getName()+suff, t.getName()+suff, null, null, suff, null, leaf));
-						}
+				} else if (subject instanceof NBTList) {
+					for (int i = 0; i < subject.size(); i++) {
+						NBTTag tag = ((NBTList)subject).get(i);
+						String suffix = tag instanceof NBTCompound ? "/" : "";
+						String str = p.parentPath+"["+i+"]"+suffix;
+						candidates.add(new Candidate(str, str, null, null, suffix, null, !(tag instanceof NBTParent)));
 					}
-				} else if (!compoundOnly) {
-					candidates.add(new Candidate(prefix+left, tag.getName(), null, null, null, null, true));
 				}
 			}
 		};
 	}
-	
-	private NBTTag resolvePath(String string, boolean error, boolean compoundOnly) throws CommandException {
+
+	private ResolvedPath resolvePath(String path, ResolvePathOption... optionsArr) throws CommandException {
+		List<ResolvePathOption> options = Arrays.asList(optionsArr);
 		NBTTag cursorWork = cursor;
-		if (string.startsWith("/")) {
+		if (path.startsWith("/")) {
 			cursorWork = root;
 		}
-		List<String> parts = Lists.newArrayList(SLASH_SPLITTER.split(string));
-		for (int i = 0; i <= parts.size(); i++) {
-			String s = i == parts.size() ? null : parts.get(i);
-			if (cursorWork instanceof NBTCompound) {
-				if (s != null) {
-					if (s.equals("..")) {
-						cursorWork = cursorWork.getParent();
-					} else if (s.equals(".") || s.isEmpty()) {
-						continue;
+		NBTParent immediateParent = cursorWork == null ? null : cursorWork.getParent();
+		// shhhhhhHHHHHH
+		path = path.replace("/", "//").replace("[", "/[").replace("]//", "]/");
+		Matcher m = PATH_SEGMENT.matcher(path);
+		String parentPath = "";
+		try {
+			while (m.find()) {
+				String seg = m.group(1);
+				if (".".equals(seg) || seg.isEmpty()) continue;
+				if ("..".equals(seg)) {
+					if (cursorWork == null) throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse above nothing");
+					if (cursorWork.getParent() == null) throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse above root");
+					cursorWork = cursorWork.getParent();
+					immediateParent = cursorWork.getParent();
+					parentPath = path.substring(0, m.end());
+				}
+				if (cursorWork instanceof NBTCompound) {
+					NBTCompound c = (NBTCompound)cursorWork;
+					immediateParent = c;
+					parentPath = path.substring(0, m.end());
+					if (c.contains(seg)) {
+						cursorWork = c.get(seg);
 					} else {
-						NBTCompound c = (NBTCompound)cursorWork;
-						if (c.contains(s)) {
-							cursorWork = c.get(s);
+						if (options.contains(CREATE_PARENTS)) {
+							cursorWork = new NBTCompound(seg);
+							c.put(cursorWork);
 						} else {
-							if (error) {
-								throw new CommandException("No such tag with path "+string);
-							} else {
-								return null;
-							}
+							throw new CommandException(VALUE_TAG_NOT_FOUND, path.substring(0, m.end()).replace("//", "/").replace("/[", "[")+" does not exist");
 						}
 					}
-				}
-			} else if (cursorWork == null) {
-				if (error) {
-					throw new CommandException("No such tag with path "+string);
+				} else if (cursorWork instanceof NBTList) {
+					NBTList l = (NBTList)cursorWork;
+					Integer i = Ints.tryParse(seg);
+					immediateParent = l;
+					parentPath = path.substring(0, m.end());
+					if (i == null || i < 0) {
+						throw new CommandException(VALUE_TAG_NOT_FOUND, seg+" is not a valid list index");
+					}
+					if (i >= l.size()) {
+						throw new CommandException(VALUE_TAG_NOT_FOUND, seg+" is out of bounds");
+					}
+					cursorWork = l.get(i);
 				} else {
-					return null;
-				}
-			} else {
-				if (s == null && !compoundOnly) continue;
-				if (error) {
-					throw new CommandException("Cannot cd into non-compound "+s);
-				} else {
-					return null;
+					throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse into "+(cursorWork == null ? "null" : NBTRegistry.typeNameFromClass(cursorWork.getClass())));
 				}
 			}
+			if (!options.contains(PARENTS_ONLY) || cursorWork instanceof NBTParent) {
+				return new ResolvedPath(immediateParent, cursorWork, parentPath.replace("//", "/"), getPath(cursorWork));
+			} else {
+				throw new CommandException(VALUE_TAG_NOT_FOUND, (cursorWork == null ? "null" : NBTRegistry.typeNameFromClass(cursorWork.getClass()))+" is not valid here");
+			}
+		} catch (CommandException e) {
+			if (!options.contains(NO_ERROR)) throw e;
+			return new ResolvedPath(immediateParent, null, parentPath.replace("//", "/"), null);
 		}
-		return cursorWork;
 	}
 
 	public void run() throws Exception {

@@ -20,20 +20,12 @@ package com.unascribed.nbted;
 
 public class CommandUsageException extends CommandException {
 
-	public CommandUsageException() {
-		super();
-	}
-
 	public CommandUsageException(String message, Throwable cause) {
-		super(message, cause);
+		super(VALUE_BAD_USAGE, message, cause);
 	}
 
 	public CommandUsageException(String message) {
-		super(message);
-	}
-
-	public CommandUsageException(Throwable cause) {
-		super(cause);
+		super(VALUE_BAD_USAGE, message);
 	}
 
 }

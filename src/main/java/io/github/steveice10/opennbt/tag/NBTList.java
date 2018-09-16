@@ -143,6 +143,7 @@ public class NBTList extends NBTParent {
 		return this.list.size();
 	}
 	
+	@Override
 	public boolean isEmpty() {
 		return this.list.isEmpty();
 	}

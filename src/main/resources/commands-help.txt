@@ -70,11 +70,24 @@ mkdir
 	No options.
 
 set, put, create, new
-	Arguments: <path> [data]
+	Arguments: <path> [data]...
 	
 	Set a value at the given path, replacing existing values. Parent
 	compounds will be created automatically. Appending a number in
 	square brackets to the path will set values within a list or array.
+	
+	Data may be more than one argument. If it is, the arguments will be
+	joined with spaces.
+	
+	Integer types support hexadecimal (0xN), octal (0N), and of course,
+	decimal (N). Integers may additionally be prefixed with a - or a +
+	to indicate negative or positive, respectively. The strings "false"
+	and "true" will be parsed as 0 and 1 respectively when a numeric
+	type is specified.
+	
+	Floating point types have more complex rules that parse raw hex
+	values, exponent notation, and the special values NaN, -Infinity,
+	and Infinity. Octal floats are not supported.
 	
 	Type is required if the value does not already exist.
 	
@@ -83,12 +96,25 @@ set, put, create, new
 		Specifies the type of value that will be set. Required if the
 		type cannot be inferred, such as when setting an initial value
 		in a list or when creating a new tag.
-		Valid types: byte, short, int, long, float, double, string
+		Valid types: byte, short, int, long, float, double, string.
 		If no data is specified, additional types are: compound, list,
-			byte-array, int-array, long-array
+		byte-array, int-array, long-array.
+		Additionally, the false type uuid may be specified, which will
+		set two long values, one suffixed with Most, the other suffixed
+		with Least, containing the most-significant 64 bits of the UUID
+		and the least-significant 64 bits, respectively.
 	--no-overwrite
 		Throw an error when attempting to overwrite. Implied if the
 		command is invoked as create or new.
+
+get
+	Arguments: <path>
+	
+	Get only the value at the given path. ls is generally better for
+	interactive use, as it includes the type of the tag and has more
+	human-friendly formatting.
+	
+	No options.
 
 append, add
 	Arguments: <path> <data>

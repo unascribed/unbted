@@ -54,6 +54,7 @@ public class NBTCompound extends NBTParent {
 		}
 	}
 
+	@Override
 	public boolean isEmpty() {
 		return this.map.isEmpty();
 	}
