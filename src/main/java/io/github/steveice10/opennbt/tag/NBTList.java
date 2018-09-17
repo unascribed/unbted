@@ -171,6 +171,7 @@ public class NBTList extends NBTParent {
 		return this.list.isEmpty();
 	}
 	
+	@Override
 	public void clear() {
 		for (NBTTag tag : list) {
 			tag.setParent(null);

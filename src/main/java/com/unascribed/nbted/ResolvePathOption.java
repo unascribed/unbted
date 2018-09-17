@@ -13,4 +13,9 @@ public enum ResolvePathOption {
 	 * Automatically create any required intermediate NBTCompounds.
 	 */
 	CREATE_PARENTS,
+	/**
+	 * Return a null leaf on an out-of-bounds list index instead of
+	 * erroring.
+	 */
+	SOFT_IOOBE,
 }

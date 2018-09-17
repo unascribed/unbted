@@ -567,7 +567,7 @@ public class CommandProcessor implements Completer, Highlighter {
 					dirty = true;
 					return;
 				}
-				ResolvedPath p = resolvePath(path, CREATE_PARENTS);
+				ResolvedPath p = resolvePath(path, CREATE_PARENTS, SOFT_IOOBE);
 				String pathNoTrailingSlashes = path;
 				while (pathNoTrailingSlashes.endsWith("/")) {
 					pathNoTrailingSlashes = pathNoTrailingSlashes.substring(0, pathNoTrailingSlashes.length()-1);
@@ -592,7 +592,7 @@ public class CommandProcessor implements Completer, Highlighter {
 					commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Least", Long.toString(u.getLeastSignificantBits()));
 					return;
 				}
-				if (p.leaf != null) {
+				if (p.leaf != null && !(p.immediateParent instanceof NBTList)) {
 					if (noOverwrite) {
 						throw new CommandException(VALUE_WONT_OVERWRITE, "Refusing to overwrite existing tag");
 					}
@@ -618,7 +618,7 @@ public class CommandProcessor implements Completer, Highlighter {
 					}
 					if (p.immediateParent instanceof NBTList) {
 						NBTList li = (NBTList)p.immediateParent;
-						Integer idx = Ints.tryParse(name);
+						Integer idx = Ints.tryParse(name.endsWith("]") ? name.substring(0, name.length()-1) : name);
 						if (idx == null || idx < 0) {
 							throw new CommandException(VALUE_TAG_NOT_FOUND, name+" is not a valid list index");
 						}
@@ -670,6 +670,8 @@ public class CommandProcessor implements Completer, Highlighter {
 			((NBTString)tag).setValue(str);
 		} else if (!str.trim().isEmpty()) {
 			throw new CommandException(VALUE_BAD_USAGE, "Tags of type "+NBTRegistry.typeNameFromClass(tag.getClass())+" cannot be created with a value");
+		} else if (tag instanceof NBTParent) {
+			((NBTParent)tag).clear();
 		}
 	}
 
@@ -808,6 +810,9 @@ public class CommandProcessor implements Completer, Highlighter {
 						throw new CommandException(VALUE_TAG_NOT_FOUND, seg+" is not a valid list index");
 					}
 					if (i >= l.size()) {
+						if (options.contains(SOFT_IOOBE)) {
+							return new ResolvedPath(immediateParent, null, parentPath.replace("/[", "[").replace("//", "/"), null);
+						}
 						throw new CommandException(VALUE_TAG_NOT_FOUND, seg+" is out of bounds");
 					}
 					cursorWork = l.get(i);

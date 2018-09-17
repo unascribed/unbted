@@ -106,6 +106,7 @@ public class NBTCompound extends NBTParent {
 		return this.map.size();
 	}
 
+	@Override
 	public void clear() {
 		for (NBTTag tag : map.values()) {
 			tag.setParent(null);
