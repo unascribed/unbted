@@ -117,6 +117,11 @@ public class NBTRegistry {
 		return byTypeName.inverse().get(clazz);
 	}
 	
+	public static String typeNameForTag(NBTTag tag) {
+		if (tag == null) return "null";
+		return typeNameFromClass(tag.getClass());
+	}
+	
 	public static BiMap<String, Class<? extends NBTTag>> allByTypeName() {
 		return Maps.unmodifiableBiMap(byTypeName);
 	}

@@ -1,5 +1,6 @@
 package com.unascribed.nbted;
 
+import io.github.steveice10.opennbt.NBTRegistry;
 import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTTag;
 
@@ -15,6 +16,11 @@ public class ResolvedPath {
 		this.leaf = leaf;
 		this.parentPath = parentPath;
 		this.canonicalPath = canonicalPath;
+	}
+	
+	@Override
+	public String toString() {
+		return "ResolvedPath[immediateParent.typeName="+NBTRegistry.typeNameForTag(immediateParent)+",leaf.typeName="+NBTRegistry.typeNameForTag(leaf)+",parentPath="+parentPath+",canonicalPath="+canonicalPath+"]";
 	}
 	
 }

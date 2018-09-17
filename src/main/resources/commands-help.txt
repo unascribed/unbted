@@ -28,7 +28,7 @@ cd
 	
 	No options.
 
-ls, dir
+ls, dir, get
 	Arguments: [path]...
 	
 	Print out the contents of the current command context, or a child
@@ -39,9 +39,14 @@ ls, dir
 	-R, --recursive
 		Print all descendants recursively, instead of only immediate
 		children.
+		Implies -s.
 	-d, --directory
-		Print the compound itself, rather than its children.
-		Overshadows -R.
+		Print the compound or list itself, rather than just its
+		children.
+		Overshadows -R and -s.
+	-s, --include-self
+		Print the compound or list itself, in addition to its children.
+		Implied if the command is invoked as get.
 	-r, --raw
 		Don't infer types.
 	-l, -1, -a, -A
@@ -67,14 +72,14 @@ mkdir
 	at the given path. Errors if a non-compound already exists at the
 	given path.
 	
-	No options.
+	-p
+		Ignored. Recognized to avoid mistakes from habit.
 
-set, put, create, new
+set, put, create, new, add
 	Arguments: <path> [data]...
 	
 	Set a value at the given path, replacing existing values. Parent
-	compounds will be created automatically. Appending a number in
-	square brackets to the path will set values within a list or array.
+	compounds will be created automatically.
 	
 	Data may be more than one argument. If it is, the arguments will be
 	joined with spaces.
@@ -91,6 +96,13 @@ set, put, create, new
 	
 	Type is required if the value does not already exist.
 	
+	If there is no root tag yet, the path is instead the name of the
+	root tag. Root tag names are seldom used, but support for them is
+	included for completeness. You may specify an empty string (i.e. '')
+	as the name if you do not want a root tag name.
+	Note: Non-compound root tags are poorly supported, and Minecraft
+	vanilla itself may not even be able to load them.
+	
 	Options:
 	--type=<type>, --<type>
 		Specifies the type of value that will be set. Required if the
@@ -103,30 +115,15 @@ set, put, create, new
 		set two long values, one suffixed with Most, the other suffixed
 		with Least, containing the most-significant 64 bits of the UUID
 		and the least-significant 64 bits, respectively.
+	--shift
+		When setting values in a list, move all later values forward by
+		one, instead of overwriting the existing value at the given
+		index. Implied if the command is invoked as add.
 	--no-overwrite
 		Throw an error when attempting to overwrite. Implied if the
 		command is invoked as create or new.
 
-get
-	Arguments: <path>
-	
-	Get only the value at the given path. ls is generally better for
-	interactive use, as it includes the type of the tag and has more
-	human-friendly formatting.
-	
-	No options.
-
-append, add
-	Arguments: <path> <data>
-	
-	Append a value to the end of an array or list at the given path.
-	Data type is inferred from the type of the array or the type of the
-	existing contents of the list. Empty lists must first be initialized
-	by using set with an index of 0.
-	
-	No options.
-
-exit, abort
+exit, quit, abort, q
 	No arguments.
 	
 	Exit unbted, without saving changes. You will be asked to confirm
@@ -134,7 +131,7 @@ exit, abort
 	
 	Options:
 	-f, --force
-		Don't ask to confirm when there are unsaved changes. Implied if
+		Don't confirm exit when there are unsaved changes. Implied if
 		the command is invoked as abort.
 
 save

@@ -74,6 +74,10 @@ public class NBTList extends NBTParent {
 		return this.type;
 	}
 
+	public boolean add(NBTTag tag) {
+		return add(size(), tag);
+	}
+	
 	/**
 	 * Adds a tag to this list tag.
 	 * If the list does not yet have a type, it will be set to the type of the tag being added.
@@ -82,21 +86,34 @@ public class NBTList extends NBTParent {
 	 * @return If the list was changed as a result.
 	 * @throws IllegalArgumentException If the tag's type differs from the list tag's type.
 	 */
-	public boolean add(NBTTag tag) throws IllegalArgumentException {
+	public boolean add(int idx, NBTTag tag) throws IllegalArgumentException {
 		if (tag == null) return false;
+		checkOrAdoptType(tag);
 
+		this.list.add(idx, tag);
+		tag.setParent(this);
+		return true;
+	}
+	
+	public NBTTag set(int idx, NBTTag tag) throws IllegalArgumentException {
+		if (tag == null) return null;
+		checkOrAdoptType(tag);
+		
+		NBTTag old = this.list.set(idx, tag);
+		tag.setParent(this);
+		if (old != null) {
+			old.setParent(null);
+		}
+		return old;
+	}
+
+	private void checkOrAdoptType(NBTTag tag) {
 		// If empty list, use this as tag type.
 		if (this.type == null) {
 			this.type = tag.getClass();
 		} else if (tag.getClass() != this.type) {
 			throw new IllegalArgumentException("Attempted to add an "+tag.getClass().getSimpleName()+" to a NBTList of type "+type.getSimpleName());
 		}
-
-		boolean b = this.list.add(tag);
-		if (b) {
-			tag.setParent(this);
-		}
-		return b;
 	}
 
 	/**
@@ -110,6 +127,9 @@ public class NBTList extends NBTParent {
 		boolean b = this.list.remove(tag);
 		if (b) {
 			tag.setParent(null);
+			if (this.isEmpty()) {
+				this.type = null;
+			}
 		}
 		return b;
 	}
@@ -118,6 +138,9 @@ public class NBTList extends NBTParent {
 		T t = (T) this.list.remove(index);
 		if (t != null) {
 			t.setParent(null);
+			if (this.isEmpty()) {
+				this.type = null;
+			}
 		}
 		return t;
 	}
@@ -153,6 +176,16 @@ public class NBTList extends NBTParent {
 			tag.setParent(null);
 		}
 		this.list.clear();
+		this.type = null;
+	}
+	
+	public int indexOf(NBTTag tag) {
+		// reimplemented for identity comparison
+		// List::indexOf uses equals
+		for (int i = 0; i < size(); i++) {
+			if (get(i) == tag) return i;
+		}
+		return -1;
 	}
 	
 	@Override
@@ -167,8 +200,7 @@ public class NBTList extends NBTParent {
 
 	@Override
 	public void read(DataInput in) throws IOException {
-		this.type = null;
-		this.list.clear();
+		clear();
 
 		int id = in.readUnsignedByte();
 		if(id != 0) {

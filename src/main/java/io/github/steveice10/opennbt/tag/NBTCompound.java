@@ -125,7 +125,7 @@ public class NBTCompound extends NBTParent {
 
 	@Override
 	public void read(DataInput in) throws IOException {
-		map.clear();
+		clear();
 		try {
 			while (true) {
 				NBTTag tag = NBTIO.readTag(in);

@@ -73,11 +73,20 @@ public class TagPrinter {
 		public boolean shouldPrintChildren() {
 			return this != NONE;
 		}
-		public RecurseMode degrade() {
+		public RecurseMode degradeForCompound() {
 			switch (this) {
 				case NONE: return NONE;
 				case IMMEDIATE_CHILDREN: return NONE;
 				case IMMEDIATE_CHILDREN_ONLY: return NONE;
+				case FULL: return FULL;
+				default: throw new AssertionError("missing case for "+this);
+			}
+		}
+		public RecurseMode degradeForList() {
+			switch (this) {
+				case NONE: return NONE;
+				case IMMEDIATE_CHILDREN: return NONE;
+				case IMMEDIATE_CHILDREN_ONLY: return IMMEDIATE_CHILDREN;
 				case FULL: return FULL;
 				default: throw new AssertionError("missing case for "+this);
 			}
@@ -169,7 +178,7 @@ public class TagPrinter {
 			if (recurse.shouldPrintRoot()) {
 				aout.print(prefix);
 				aout.print("compound ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
-				printName(tag.getName(), false);
+				printName(tag, tag.getName(), false);
 			}
 			if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 				if (recurse.shouldPrintChildren()) {
@@ -185,7 +194,7 @@ public class TagPrinter {
 									NBTTag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
 									if (most instanceof NBTLong && least instanceof NBTLong) {
 										UUID u = new UUID(((NBTLong)most).longValue(), ((NBTLong)least).longValue());
-										printBasic(u.toString(), t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix, values);
+										printBasic(tag, u.toString(), t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix, values);
 										continue;
 									}
 								}
@@ -197,7 +206,7 @@ public class TagPrinter {
 									}
 								}
 							}
-							printTag(t, childPrefix, infer, recurse.degrade(), values);
+							printTag(t, childPrefix, infer, recurse.degradeForCompound(), values);
 						}
 						if (recurse.shouldPrintRoot()) {
 							aout.print(prefix);
@@ -222,7 +231,7 @@ public class TagPrinter {
 				if (recurse.shouldPrintRoot()) {
 					aout.print(prefix);
 					aout.print("list ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
-					printName(tag.getName(), false);
+					printName(tag, tag.getName(), false);
 					if (values) {
 						if (recurse.shouldPrintChildren()) {
 							aout.println(" []", AnsiCode.RESET);
@@ -263,7 +272,7 @@ public class TagPrinter {
 					if (recurse.shouldPrintRoot()) {
 						aout.print(prefix);
 						aout.print("~registry ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
-						printName(tag.getName(), false);
+						printName(tag, tag.getName(), false);
 						aout.println(" [", AnsiCode.RESET);
 					}
 					// these assumptions are safe due to the checks above that set the forgeRegistry flag
@@ -276,12 +285,19 @@ public class TagPrinter {
 							return ((Comparable)a.get("V")).compareTo(b.get("V"));
 						}
 					});
+					int indexLength = Integer.toString(lt.size()-1).length();
 					for (NBTTag t : copy) {
 						NBTCompound ct = (NBTCompound)t;
 						if (ct.size() == 2 && ct.contains("K") && ct.contains("V")) {
 							aout.print(prefix);
 							if (recurse.shouldPrintRoot()) aout.print("  ");
-							printName(ct.get("K").stringValue(), true);
+							String str = Integer.toString(lt.indexOf(ct));
+							for (int i = str.length(); i < indexLength; i++) {
+								aout.print(" ");
+							}
+							aout.print(str, AnsiCode.RESET);
+							aout.print(": ");
+							printName(tag, ct.get("K").stringValue(), true);
 							printVal(ct.get("V").stringValue());
 							continue;
 						}
@@ -294,13 +310,13 @@ public class TagPrinter {
 					if (recurse.shouldPrintRoot()) {
 						aout.print(prefix);
 						aout.print("list ", AnsiCode.FG_WHITE_INTENSE, AnsiCode.BOLD);
-						printName(tag.getName(), false);
+						printName(tag, tag.getName(), false);
 					}
 					if (values || (recurse.shouldPrintChildren() && !recurse.shouldPrintRoot())) {
 						if (recurse.shouldPrintChildren()) {
 							if (recurse.shouldPrintRoot()) aout.println(" [", AnsiCode.RESET);
 							for (NBTTag t : lt) {
-								printTag(t, recurse.shouldPrintRoot() ? prefix+"  " : prefix, infer, recurse, values);
+								printTag(t, recurse.shouldPrintRoot() ? prefix+"  " : prefix, infer, recurse.degradeForList(), values);
 							}
 							if (recurse.shouldPrintRoot()) {
 								aout.print(prefix);
@@ -343,13 +359,13 @@ public class TagPrinter {
 					}
 				}
 				if (maybeBoolean) {
-					printBasic(Boolean.toString(((NBTByte)tag).booleanValue()), tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix, values);
+					printBasic(tag, Boolean.toString(((NBTByte)tag).booleanValue()), tag.getName(), "~bool", AnsiCode.FG_YELLOW, prefix, values);
 					return;
 				}
 			}
-			printBasic(tag.stringValue(), tag.getName(), "byte", AnsiCode.FG_YELLOW, prefix, values);
+			printBasic(tag, tag.stringValue(), tag.getName(), "byte", AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof NBTNumber) {
-			printBasic(tag.stringValue(), tag.getName(), NBTRegistry.typeNameFromClass(tag.getClass()), AnsiCode.FG_YELLOW, prefix, values);
+			printBasic(tag, tag.stringValue(), tag.getName(), NBTRegistry.typeNameFromClass(tag.getClass()), AnsiCode.FG_YELLOW, prefix, values);
 		} else if (tag instanceof NBTString) {
 			if (infer) {
 				String str = tag.stringValue();
@@ -370,21 +386,21 @@ public class TagPrinter {
 									.replace("{", AnsiCode.RESET+"{")
 									.replace("}", AnsiCode.RESET+"}")
 									;
-							printBasic(recurse.shouldPrintChildren() ? jstr : "...", tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
+							printBasic(tag, recurse.shouldPrintChildren() ? jstr : "...", tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
 						} else {
-							printBasic(null, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
+							printBasic(tag, null, tag.getName(), "~json", AnsiCode.FG_RED_INTENSE, prefix, values);
 						}
 						return;
 					} catch (Exception e) {}
 				}
 			}
-			printBasic(tag.stringValue(), tag.getName(), "string", AnsiCode.FG_RED, prefix, values);
+			printBasic(tag, tag.stringValue(), tag.getName(), "string", AnsiCode.FG_RED, prefix, values);
 		} else if (tag instanceof NBTByteArray) {
-			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof NBTIntArray) {
-			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof NBTLongArray) {
-			printBasic(colorizeArray(tag.stringValue()), tag.getName(), "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		}
 	}
 	
@@ -394,11 +410,11 @@ public class TagPrinter {
 				.replace(",", AnsiCode.RESET+","+AnsiCode.FG_GREEN);
 	}
 
-	public void printBasic(String val, String name, String type, AnsiCode color, String prefix, boolean values) {
+	public void printBasic(NBTTag tag, String val, String name, String type, AnsiCode color, String prefix, boolean values) {
 		aout.print(prefix);
 		aout.print(type, color);
 		aout.print(" ");
-		printName(name, values);
+		printName(tag, name, values);
 		if (values) printVal(val);
 	}
 
@@ -408,7 +424,7 @@ public class TagPrinter {
 		aout.println(AnsiCode.RESET);
 	}
 
-	public void printName(String name, boolean equals) {
+	public void printName(NBTTag tag, String name, boolean equals) {
 		if (name != null && !name.isEmpty()) {
 			aout.print("\"", AnsiCode.FG_BLUE_INTENSE);
 			aout.print(escaper.escape(name));
@@ -416,8 +432,20 @@ public class TagPrinter {
 			if (equals) {
 				aout.print(" = ", AnsiCode.RESET);
 			}
-		} else if (equals) {
-			aout.print(" ");
+		} else {
+			if (tag.getParent() instanceof NBTList) {
+				String str = Integer.toString(((NBTList)tag.getParent()).indexOf(tag));
+				int maxLen = Integer.toString(((NBTList)tag.getParent()).size()-1).length();
+				for (int i = str.length(); i < maxLen; i++) {
+					aout.print(" ");
+				}
+				aout.print(str, AnsiCode.RESET);
+				if (equals) {
+					aout.print(" = ");
+				}
+			} else if (equals) {
+				aout.print(" ");
+			}
 		}
 	}
 
