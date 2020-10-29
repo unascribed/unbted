@@ -40,7 +40,7 @@ import com.google.common.base.Objects;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 
-public class NBTCompound extends NBTParent {
+public class NBTCompound extends NBTTag implements NBTParent {
 	private final Map<String, NBTTag> map = Maps.newHashMap();
 
 	public NBTCompound(String name) {

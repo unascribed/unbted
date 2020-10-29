@@ -20,13 +20,10 @@
  * SOFTWARE.
  */
 
-package io.github.steveice10.opennbt.tag;
+package io.github.steveice10.opennbt.tag.array.support;
 
-public interface NBTParent extends Iterable<NBTTag> {
+public interface NBTArrayFake {
 
-	boolean remove(NBTTag tag);
-	int size();
-	boolean isEmpty();
-	void clear();
+	int getIndex();
 	
 }

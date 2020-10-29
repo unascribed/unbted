@@ -22,11 +22,13 @@
 
 package io.github.steveice10.opennbt.tag;
 
-public interface NBTParent extends Iterable<NBTTag> {
+public interface NBTIndexed extends NBTParent {
 
-	boolean remove(NBTTag tag);
-	int size();
-	boolean isEmpty();
-	void clear();
+	<T extends NBTTag> T get(int index);
+	boolean add(NBTTag tag);
+	boolean add(int idx, NBTTag tag);
+	NBTTag set(int idx, NBTTag tag);
+	
+	Class<? extends NBTTag> getElementType();
 	
 }

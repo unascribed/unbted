@@ -38,7 +38,7 @@ public class ResolvedPath {
 	
 	@Override
 	public String toString() {
-		return "ResolvedPath[immediateParent.typeName="+NBTRegistry.typeNameForTag(immediateParent)+",leaf.typeName="+NBTRegistry.typeNameForTag(leaf)+",parentPath="+parentPath+",canonicalPath="+canonicalPath+"]";
+		return "ResolvedPath[immediateParent.typeName="+NBTRegistry.typeNameForTag((NBTTag)immediateParent)+",leaf.typeName="+NBTRegistry.typeNameForTag(leaf)+",parentPath="+parentPath+",canonicalPath="+canonicalPath+"]";
 	}
 	
 }

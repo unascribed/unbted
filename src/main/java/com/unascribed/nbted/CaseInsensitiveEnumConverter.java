@@ -21,6 +21,7 @@ package com.unascribed.nbted;
 import java.util.Locale;
 
 import com.google.common.base.Enums;
+import com.google.common.base.Optional;
 
 import joptsimple.ValueConverter;
 
@@ -34,7 +35,11 @@ public class CaseInsensitiveEnumConverter<E extends Enum<E>> implements ValueCon
 	
 	@Override
 	public E convert(String value) {
-		return Enums.getIfPresent(clazz, value.toUpperCase(Locale.ROOT)).get();
+		Optional<E> opt = Enums.getIfPresent(clazz, value.toUpperCase(Locale.ROOT));
+		if (!opt.isPresent()) {
+			throw new IllegalArgumentException(value+" is not an acceptable value for "+valuePattern());
+		}
+		return opt.get();
 	}
 
 	@Override

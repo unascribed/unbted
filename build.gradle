@@ -65,7 +65,8 @@ task fatJar(type: Jar) {
 	classifier 'fat'
 	project.configurations.compile.resolve().each {
 		from(zipTree(it))
-		exclude 'META-INF/**'
+		exclude 'META-INF/services/**'
+		exclude 'META-INF/maven/**'
 	}
 	from(sourceSets.main.output)
 }
@@ -77,7 +78,15 @@ jar {
 		)
 	}
 	from(zipTree('build/tmp/proguard.jar'))
-	exclude 'META-INF/**'
+	exclude 'META-INF/services/**'
+	exclude 'META-INF/maven/**'
+}
+
+task nativeImage(type: Exec) {
+	dependsOn jar
+	inputs.file 'build/libs/unbted-'+project.version+'.jar'
+	outputs.file 'build/libs/unbted-'+project.version+'-'+('uname -m'.execute().text.trim())
+	commandLine './build-native-image.sh', project.version
 }
 
 license {

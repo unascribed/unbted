@@ -18,24 +18,8 @@
 
 package com.unascribed.nbted;
 
-import java.io.File;
-
-public class FileInfo {
-
-	public static final File STDIN = new File("/dev/stdin");
-	
-	public final File sourceFile;
-	public final Compression compressionMethod;
-	public final boolean compressionAutodetected;
-	public final Endianness endianness;
-	public final boolean isJson;
-	
-	public FileInfo(File sourceFile, Compression compressionMethod, boolean compressionAutodetected, Endianness endianness, boolean isJson) {
-		this.sourceFile = sourceFile;
-		this.compressionMethod = compressionMethod;
-		this.compressionAutodetected = compressionAutodetected;
-		this.endianness = endianness;
-		this.isJson = isJson;
-	}
-	
+public enum JsonMode {
+	NONE,
+	BASIC,
+	ROUNDTRIP
 }

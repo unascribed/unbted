@@ -25,6 +25,8 @@ import java.io.FileInputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PushbackInputStream;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -48,6 +50,7 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -58,6 +61,7 @@ import com.unascribed.miniansi.AnsiStream;
 import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
+import io.github.steveice10.opennbt.NBTRegistry;
 import io.github.steveice10.opennbt.tag.NBTCompound;
 import io.github.steveice10.opennbt.tag.NBTList;
 import io.github.steveice10.opennbt.tag.NBTString;
@@ -65,7 +69,13 @@ import io.github.steveice10.opennbt.tag.NBTTag;
 import io.github.steveice10.opennbt.tag.array.NBTByteArray;
 import io.github.steveice10.opennbt.tag.array.NBTIntArray;
 import io.github.steveice10.opennbt.tag.array.NBTLongArray;
+import io.github.steveice10.opennbt.tag.number.NBTByte;
+import io.github.steveice10.opennbt.tag.number.NBTDouble;
+import io.github.steveice10.opennbt.tag.number.NBTFloat;
+import io.github.steveice10.opennbt.tag.number.NBTInt;
+import io.github.steveice10.opennbt.tag.number.NBTLong;
 import io.github.steveice10.opennbt.tag.number.NBTNumber;
+import io.github.steveice10.opennbt.tag.number.NBTShort;
 import joptsimple.NonOptionArgumentSpec;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
@@ -84,7 +94,7 @@ public class NBTEd {
 	}
 	
 	public static boolean VERBOSE = true;
-	public static boolean JSON = false;
+	public static JsonMode JSON_MODE = JsonMode.NONE;
 	public static boolean INFER = true;
 	public static boolean PAGER = true;
 	
@@ -122,7 +132,7 @@ public class NBTEd {
 	}
 	
 	public static final AnsiStream aout = new AnsiStream(System.out);
-	private static final Gson gson = new Gson();
+	public static final Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().create();
 	public static Terminal terminal;
 	
 	public static void main(String[] args) throws Exception {
@@ -162,9 +172,13 @@ public class NBTEd {
 			parser.acceptsAll(Arrays.asList("print", "p")),
 			parser.acceptsAll(Arrays.asList("no-print", "n"))
 		);
-		parser.acceptsAll(Arrays.asList("json", "j"));
+		parser.mutuallyExclusive(
+			parser.acceptsAll(Arrays.asList("json", "j")),
+			parser.acceptsAll(Arrays.asList("roundtrip-json", "J"))
+		);
 		parser.acceptsAll(Arrays.asList("raw", "r"));
 		parser.acceptsAll(Arrays.asList("no-pager"));
+		parser.acceptsAll(Arrays.asList("version", "V"));
 		parser.posixlyCorrect(System.getenv("POSIXLY_CORRECT") != null);
 		NonOptionArgumentSpec<String> nonoption = parser.nonOptions().ofType(String.class);
 		
@@ -177,6 +191,15 @@ public class NBTEd {
 			System.exit(1);
 			return;
 		}
+		if (set.has("version")) {
+			System.err.println("Una's NBT Editor v"+VERSION);
+			System.err.println("Copyright (C) 2018 - 2020 Una Thompson (unascribed)");
+			System.err.println("License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.");
+			System.err.println("This is free software: you are free to change and redistribute it.");
+			System.err.println("There is NO WARRANTY, to the extent permitted by law.");
+			return;
+		}
+		
 		if (!set.has("verbose")) {
 			VERBOSE = false;
 			Logger root = Logger.getLogger("");
@@ -222,7 +245,9 @@ public class NBTEd {
 			}
 		}
 		if (set.has("json")) {
-			JSON = true;
+			JSON_MODE = JsonMode.BASIC;
+		} else if (set.has("roundtrip-json")) {
+			JSON_MODE = JsonMode.ROUNDTRIP;
 		}
 		if (set.has("raw")) {
 			INFER = false;
@@ -266,6 +291,7 @@ public class NBTEd {
 		} else if (set.has("big-endian")) {
 			endianness = Endianness.BIG;
 		}
+		boolean isJson = false;
 		NBTTag tag = null;
 		if (inSupplier != null) {
 			try {
@@ -274,29 +300,52 @@ public class NBTEd {
 					final ExceptableSupplier<InputStream, IOException> currentSupplier = inSupplier;
 					inSupplier = () -> compressionMethodFinal.wrap(currentSupplier.get());
 				}
-				if (endianness != null) {
-					try (InputStream is = inSupplier.get()) {
-						tag = NBTIO.readTag(endianness.wrap(is));
-					}
-				} else {
-					try {
-						try (InputStream is = inSupplier.get()) {
-							tag = NBTIO.readTag(is, false);
-						}
-						if (tag == null) throw new RuntimeException("Got null root tag");
-						endianness = Endianness.BIG;
-						log("Endianness autodetected as big-endian");
-					} catch (Exception e) {
-						try {
-							try (InputStream is = inSupplier.get()) {
-								tag = NBTIO.readTag(is, true);
+				try (PushbackInputStream is = new PushbackInputStream(inSupplier.get())) {
+					int firstByte = is.read();
+					is.unread(firstByte);
+					if (firstByte == '{') {
+						isJson = true;
+						log("Detected JSON file");
+						JsonObject json = gson.fromJson(new InputStreamReader(is, Charsets.UTF_8), JsonObject.class);
+						JsonElement unbtedMarker = json.get("_unbted");
+						if (unbtedMarker != null) {
+							int version = unbtedMarker.getAsInt();
+							if (version > 1) {
+								System.err.println("unbted: This looks like an NBT JSON file, but it's of a version newer than I know how to read. ("+version+")");
+								System.err.println("unbted: Aborting.");
+								System.exit(2);
+								return;
+							} else {
+								log("Looks like NBT JSON");
+								tag = fromJson(json.get("rootType").getAsString()+":"+json.get("rootName").getAsString(), json.get("root"));
 							}
-							if (tag == null) throw new RuntimeException("Got null root tag");
-							endianness = Endianness.LITTLE;
-							log("Endianness autodetected as little-endian");
-						} catch (Exception e2) {
-							e2.addSuppressed(e);
-							throw e2;
+						} else {
+							System.err.println("unbted: This looks like a JSON file, but it's not an NBT JSON file.");
+							System.err.println("unbted: Aborting.");
+							System.exit(2);
+							return;
+						}
+					} else {
+						log("Detected binary file");
+						if (endianness != null) {
+							tag = NBTIO.readTag(endianness.wrap(is));
+						} else {
+							try {
+								tag = NBTIO.readTag(is, false);
+								if (tag == null) throw new RuntimeException("Got null root tag");
+								endianness = Endianness.BIG;
+								log("Endianness autodetected as big-endian");
+							} catch (Exception e) {
+								try {
+									tag = NBTIO.readTag(is, true);
+									if (tag == null) throw new RuntimeException("Got null root tag");
+									endianness = Endianness.LITTLE;
+									log("Endianness autodetected as little-endian");
+								} catch (Exception e2) {
+									e2.addSuppressed(e);
+									throw e2;
+								}
+							}
 						}
 					}
 				}
@@ -309,6 +358,8 @@ public class NBTEd {
 					if (detectedCompressionMethod != null && detectedCompressionMethod != compressionMethod) {
 						System.err.println("unbted: It looks like "+detectedCompressionMethod+" to me");
 					}
+				} else if (isJson) {
+					System.err.println("unbted: Are you sure this is an unbted NBT JSON file?");
 				} else {
 					System.err.print("unbted: Are you sure this is an NBT file?");
 					if (endianness != null) {
@@ -332,8 +383,16 @@ public class NBTEd {
 		inSupplier = null;
 		TagPrinter printer = new TagPrinter(System.out);
 		if (!set.has("no-print")) {
-			if (JSON) {
-				JsonElement e = toJson(tag);
+			if (JSON_MODE != JsonMode.NONE) {
+				JsonElement e = toJson(tag, JSON_MODE == JsonMode.ROUNDTRIP);
+				if (JSON_MODE == JsonMode.ROUNDTRIP) {
+					JsonObject obj = new JsonObject();
+					obj.addProperty("_unbted", 1);
+					obj.addProperty("rootType", getTypePrefix(tag));
+					obj.addProperty("rootName", tag == null ? "" : tag.getName());
+					obj.add("root", e);
+					e = obj;
+				}
 				StringWriter sw = new StringWriter();
 				JsonWriter jw = new JsonWriter(sw);
 				jw.setIndent("  ");
@@ -352,26 +411,108 @@ public class NBTEd {
 			System.err.println("conditions; type `copying` for details.");
 			System.err.println();
 			System.err.println("Type `help` for help");
-			CommandProcessor cp = new CommandProcessor(tag, printer, new FileInfo(sourceFile, compressionMethod, compressionAutodetected, endianness));
+			CommandProcessor cp = new CommandProcessor(tag, printer, new FileInfo(sourceFile, compressionMethod, compressionAutodetected, endianness, isJson));
 			cp.run();
 		}
 	}
 	
-	private static JsonElement toJson(NBTTag tag) {
+	public static String getTypePrefix(NBTTag tag) {
+		if (tag == null) {
+			return "null";
+		} else if (tag instanceof NBTList) {
+			NBTList li = (NBTList)tag;
+			if (li.getElementType() != null) {
+				return "list<"+getTypePrefix(li.get(0))+">";
+			}
+			return "list<?>";
+		} else {
+			return NBTRegistry.typeNameForTag(tag);
+		}
+	}
+	
+	private static NBTTag fromJson(String name, JsonElement ele) {
+		int colon = name.indexOf(':');
+		if (colon == -1) throw new IllegalArgumentException("All keys in an unbted NBT JSON file must be prefixed with their type");
+		String type = name.substring(0, colon);
+		name = name.substring(colon+1);
+		if ("null".equals(type)) {
+			return null;
+		} else if ("byte".equals(type)) {
+			return new NBTByte(name, ele.getAsByte());
+		} else if ("double".equals(type)) {
+			return new NBTDouble(name, ele.getAsDouble());
+		} else if ("float".equals(type)) {
+			return new NBTFloat(name, ele.getAsFloat());
+		} else if ("int".equals(type)) {
+			return new NBTInt(name, ele.getAsInt());
+		} else if ("long".equals(type)) {
+			return new NBTLong(name, ele.getAsLong());
+		} else if ("short".equals(type)) {
+			return new NBTShort(name, ele.getAsShort());
+		} else if ("compound".equals(type)) {
+			NBTCompound out = new NBTCompound(name);
+			for (Map.Entry<String, JsonElement> en : ele.getAsJsonObject().entrySet()) {
+				if ("_unbted".equals(en.getKey())) continue;
+				out.put(fromJson(en.getKey(), en.getValue()));
+			}
+			return out;
+		} else if (type.startsWith("list<")) {
+			int closer = type.lastIndexOf('>');
+			if (closer == -1) {
+				throw new IllegalArgumentException("Expected closing > in list type, didn't find one (for "+type+")");
+			}
+			String innerType = type.substring(5, closer);
+			if ("?".equals(innerType)) {
+				if (ele == null || ele.getAsJsonArray().size() == 0) {
+					return new NBTList(name);
+				} else {
+					throw new IllegalArgumentException("Cannot have list of unknown type with elements");
+				}
+			} else {
+				NBTList out = new NBTList(name);
+				for (JsonElement child : ele.getAsJsonArray()) {
+					out.add(fromJson(innerType+":", child));
+				}
+				return out;
+			}
+		} else if ("string".equals(type)) {
+			return new NBTString(name, ele.getAsString());
+		} else if ("byte-array".equals(type)) {
+			return new NBTByteArray(name, BaseEncoding.base64().decode(ele.getAsString()));
+		} else if ("int-array".equals(type)) {
+			JsonArray arr = ele.getAsJsonArray();
+			int[] out = new int[arr.size()];
+			for (int i = 0; i < out.length; i++) {
+				out[i] = arr.get(i).getAsInt();
+			}
+			return new NBTIntArray(name, out);
+		} else if ("long-array".equals(type)) {
+			JsonArray arr = ele.getAsJsonArray();
+			long[] out = new long[arr.size()];
+			for (int i = 0; i < out.length; i++) {
+				out[i] = arr.get(i).getAsLong();
+			}
+			return new NBTLongArray(name, out);
+		} else {
+			throw new IllegalArgumentException("Unknown type "+type+" when parsing key "+type+":"+name);
+		}
+	}
+	
+	public static JsonElement toJson(NBTTag tag, boolean roundTrip) {
 		if (tag == null) {
 			return JsonNull.INSTANCE;
 		} else if (tag instanceof NBTCompound) {
 			JsonObject out = new JsonObject();
 			NBTCompound in = (NBTCompound)tag;
 			for (NBTTag t : in.values()) {
-				out.add(t.getName(), toJson(t));
+				out.add((roundTrip ? getTypePrefix(t)+":" : "")+t.getName(), toJson(t, roundTrip));
 			}
 			return out;
 		} else if (tag instanceof NBTList) {
 			JsonArray out = new JsonArray();
 			NBTList in = (NBTList)tag;
 			for (NBTTag t : in) {
-				out.add(toJson(t));
+				out.add(toJson(t, roundTrip));
 			}
 			return out;
 		} else if (tag instanceof NBTNumber) {

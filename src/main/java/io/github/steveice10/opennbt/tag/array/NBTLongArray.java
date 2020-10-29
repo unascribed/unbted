@@ -26,10 +26,17 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 
+import com.google.common.collect.AbstractIterator;
+import com.google.common.primitives.Longs;
+
+import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.support.NBTFakeLong;
+import io.github.steveice10.opennbt.tag.number.NBTLong;
 
-public class NBTLongArray extends NBTArray {
+public class NBTLongArray extends NBTArray implements NBTParent {
 	private long[] value;
 
 	public NBTLongArray(String name) {
@@ -64,11 +71,6 @@ public class NBTLongArray extends NBTArray {
 	}
 
 	@Override
-	public int length() {
-		return this.value.length;
-	}
-
-	@Override
 	public void read(DataInput in) throws IOException {
 		this.value = new long[in.readInt()];
 		for (int i = 0; i < this.value.length; i++) {
@@ -97,6 +99,92 @@ public class NBTLongArray extends NBTArray {
 	@Override
 	public String toString() {
 		return "NBTLongArray"+Arrays.toString(this.value);
+	}
+	
+	@Override
+	public Class<? extends NBTTag> getElementType() {
+		return NBTLong.class;
+	}
+
+	@Override
+	public Iterator<NBTTag> iterator() {
+		return new AbstractIterator<NBTTag>() {
+			private int idx = -1;
+			
+			@Override
+			protected NBTTag computeNext() {
+				idx++;
+				if (idx >= value.length) return endOfData();
+				return new NBTFakeLong(NBTLongArray.this, idx);
+			}
+		};
+	}
+	
+	@Override
+	public NBTFakeLong get(int idx) {
+		if (idx < 0 || idx >= value.length) throw new ArrayIndexOutOfBoundsException(idx);
+		return new NBTFakeLong(this, idx);
+	}
+	
+	@Override
+	public boolean add(int idx, NBTTag tag) {
+		if (tag instanceof NBTLong) {
+			long[] lhs = Arrays.copyOfRange(value, 0, idx);
+			long[] mid = new long[] {((NBTLong) tag).longValue()};
+			long[] rhs = Arrays.copyOfRange(value, idx, value.length);
+			value = Longs.concat(lhs, mid, rhs);
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public boolean add(NBTTag tag) {
+		if (tag instanceof NBTLong) {
+			value = Arrays.copyOf(value, value.length+1);
+			value[value.length-1] = ((NBTLong) tag).longValue();
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public NBTTag set(int idx, NBTTag tag) {
+		if (tag instanceof NBTLong) {
+			long orig = value[idx];
+			value[idx] = ((NBTLong) tag).longValue();
+			return new NBTLong("", orig);
+		}
+		throw new ClassCastException(tag.getClass().getSimpleName()+" is not NBTLong");
+	}
+
+	@Override
+	public boolean remove(NBTTag tag) {
+		if (tag instanceof NBTFakeLong) {
+			NBTFakeLong nfb = (NBTFakeLong)tag;
+			if (nfb.getParent() == this) {
+				long[] lhs = Arrays.copyOfRange(value, 0, nfb.getIndex());
+				long[] rhs = Arrays.copyOfRange(value, nfb.getIndex()+1, value.length);
+				value = Longs.concat(lhs, rhs);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public int size() {
+		return value.length;
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return value.length == 0;
+	}
+
+	@Override
+	public void clear() {
+		value = new long[0];
 	}
 	
 }

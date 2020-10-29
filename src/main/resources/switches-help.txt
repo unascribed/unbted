@@ -2,8 +2,8 @@ Usage: unbted [options] [file]
 
 Una's NBT Editor
 
-Edit an NBT (Named Binary Tag) file interactively, or print it out in a
-JSON-like format for reading. Optionally convert it to well-formed JSON
+Edit an NBT (Named Binary Tag) or NBT JSON file interactively, or print it out
+in a JSON-like format for reading. Optionally convert it to well-formed JSON
 for processing.
 
 Valid options:
@@ -47,13 +47,24 @@ Valid options:
 
 	-j, --json
 		Print out well-formed JSON instead of a human-readable
-		colored format.
-
+		colored format. The keys in the JSON match those in the NBT 1:1.
+		Cannot be converted back to NBT; type information is lost in the
+		conversion.
+	
+	-J, --roundtrip-json
+		Print out well-formed JSON where the keys are prefixed with the
+		original NBT type. Can be converted back into NBT by invoking
+		unbted with the JSON file as an argument. Can also be generated
+		by the save command in an unbted session.
+	
 	-r, --raw
 		Don't infer types.
 
 	--no-pager
 		Disable use of the embedded less-like pager.
+	
+	-V, --version
+		Print the version of unbted and exit.
 
 Exit codes:
 	0: Success

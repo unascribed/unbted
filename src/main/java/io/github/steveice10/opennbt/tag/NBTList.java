@@ -35,7 +35,7 @@ import com.google.common.collect.Lists;
 
 import io.github.steveice10.opennbt.NBTRegistry;
 
-public class NBTList extends NBTParent {
+public class NBTList extends NBTTag implements NBTParent, NBTIndexed {
 	private Class<? extends NBTTag> type;
 	private final List<NBTTag> list = Lists.newArrayList();
 
@@ -70,10 +70,12 @@ public class NBTList extends NBTParent {
 	/**
 	 * @return The ListTag's element type, or null if the list does not yet have a defined type.
 	 */
+	@Override
 	public Class<? extends NBTTag> getElementType() {
 		return this.type;
 	}
 
+	@Override
 	public boolean add(NBTTag tag) {
 		return add(size(), tag);
 	}
@@ -86,6 +88,7 @@ public class NBTList extends NBTParent {
 	 * @return If the list was changed as a result.
 	 * @throws IllegalArgumentException If the tag's type differs from the list tag's type.
 	 */
+	@Override
 	public boolean add(int idx, NBTTag tag) throws IllegalArgumentException {
 		if (tag == null) return false;
 		checkOrAdoptType(tag);
@@ -95,6 +98,7 @@ public class NBTList extends NBTParent {
 		return true;
 	}
 	
+	@Override
 	public NBTTag set(int idx, NBTTag tag) throws IllegalArgumentException {
 		if (tag == null) return null;
 		checkOrAdoptType(tag);
@@ -152,6 +156,7 @@ public class NBTList extends NBTParent {
 	 * @param index Index of the tag.
 	 * @return The tag at the given index.
 	 */
+	@Override
 	public <T extends NBTTag> T get(int index) {
 		return (T) this.list.get(index);
 	}

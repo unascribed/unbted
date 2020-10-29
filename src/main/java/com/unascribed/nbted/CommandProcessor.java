@@ -18,11 +18,10 @@
 
 package com.unascribed.nbted;
 
-import java.io.Closeable;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Arrays;
@@ -48,25 +47,33 @@ import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
+
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CountingOutputStream;
 import com.google.common.primitives.Ints;
+
+import com.google.gson.JsonObject;
 import com.unascribed.miniansi.AnsiCode;
 import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
 import io.github.steveice10.opennbt.NBTRegistry;
 import io.github.steveice10.opennbt.tag.NBTCompound;
+import io.github.steveice10.opennbt.tag.NBTIndexed;
 import io.github.steveice10.opennbt.tag.NBTList;
 import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTString;
 import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.NBTByteArray;
+import io.github.steveice10.opennbt.tag.array.support.NBTArrayFake;
 import io.github.steveice10.opennbt.tag.number.NBTByte;
 import io.github.steveice10.opennbt.tag.number.NBTDouble;
 import io.github.steveice10.opennbt.tag.number.NBTFloat;
@@ -222,6 +229,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				parser.acceptsAll(Arrays.asList("d", "directory"), "print just the tag, no children");
 				parser.acceptsAll(Arrays.asList("s", "include-self"), "print the tag in addition to children");
 				parser.acceptsAll(Arrays.asList("r", "raw"), "do not infer types");
+				parser.acceptsAll(Arrays.asList("base64"), "print byte arrays as base64");
 				parser.acceptsAll(Arrays.asList("l", "1", "a", "A"), "ignored");
 			})
 			.action((alias, set, args) -> {
@@ -266,7 +274,7 @@ public class CommandProcessor implements Completer, Highlighter {
 					NBTTag t = cursor;
 					while (t != null) {
 						contextParents.add(t);
-						t = t.getParent();
+						t = asTag(t.getParent());
 					}
 				}
 				for (String s : args) {
@@ -278,7 +286,7 @@ public class CommandProcessor implements Completer, Highlighter {
 								throw new CommandException(VALUE_CMDSPECIFIC_1, "Refusing to delete non-empty compound "+getPath(t)+" - add -r to override");
 							}
 						}
-						NBTTag parent = t.getParent();
+						NBTTag parent = asTag(t.getParent());
 						if (parent == null) {
 							if (t != root) {
 								throw new ConsistencyError("Tag has no parent but isn't the root!?");
@@ -328,31 +336,8 @@ public class CommandProcessor implements Completer, Highlighter {
 			.action((alias, set, args) -> {
 				if (!args.isEmpty()) throw new CommandUsageException("Too many arguments");
 				if (dirty && !alias.equals("abort") && !set.has("force")) {
-					try {
-						boolean cont = true;
-						reader.setOpt(Option.DISABLE_HIGHLIGHTER);
-						reader.unsetOpt(Option.ERASE_LINE_ON_FINISH);
-						while (cont) {
-							String line = reader.readLine("There are unsaved changes. Are you sure you want to exit? [y/N] ");
-							if (line.trim().isEmpty()) line = "n";
-							switch (line.charAt(0)) {
-								case 'n':
-								case 'N':
-									return;
-								case 'y':
-								case 'Y':
-									cont = false;
-									break;
-								default:
-									System.err.println("Unrecognized choice "+line+". Enter Y or N.");
-									break;
-							}
-						}
-					} catch (UserInterruptException | EndOfFileException e) {
+					if (!prompt("There are unsaved changes. Are you sure you want to exit?", false)) {
 						return;
-					} finally {
-						reader.unsetOpt(Option.DISABLE_HIGHLIGHTER);
-						reader.setOpt(Option.ERASE_LINE_ON_FINISH);
 					}
 				}
 				stop();
@@ -384,9 +369,12 @@ public class CommandProcessor implements Completer, Highlighter {
 					System.out.print(" (detected)");
 				}
 				System.out.println();
-				System.out.print("Endianness: ");
-				System.out.println(fileInfo.endianness);
+				if (!fileInfo.isJson) {
+					System.out.print("Endianness: ");
+					System.out.println(fileInfo.endianness);
+				}
 				System.out.print("File size: ...calculating...");
+				System.out.flush();
 				OutputStream out = ByteStreams.nullOutputStream();
 				CountingOutputStream compressedCounter = null;
 				if (fileInfo.compressionMethod != Compression.NONE && fileInfo.compressionMethod != null) {
@@ -424,11 +412,24 @@ public class CommandProcessor implements Completer, Highlighter {
 				parser.acceptsAll(Arrays.asList("compression", "c"), "write with the given compression format").withRequiredArg().ofType(Compression.class)
 						.withValuesConvertedBy(new CaseInsensitiveEnumConverter<>(Compression.class));
 				parser.acceptsAll(Arrays.asList("default", "d"), "update default file");
+				parser.mutuallyExclusive(
+						parser.acceptsAll(Arrays.asList("roundtrip-json", "json", "j", "J"), "write in roundtrip NBT JSON format"),
+						parser.acceptsAll(Arrays.asList("nbt", "N"), "write in NBT format")
+				);
+				parser.acceptsAll(Arrays.asList("force", "f"), "just do it, don't ask questions");
 			})
 			.action((set, args) -> {
 				if (args.size() > 1) throw new CommandUsageException("Too many arguments");
 				if (root == null) {
 					throw new CommandException(VALUE_TAG_NOT_FOUND, "Nothing to write");
+				}
+				boolean json;
+				if (set.has("roundtrip-json")) {
+					json = true;
+				} else if (set.has("nbt")) {
+					json = false;
+				} else {
+					json = fileInfo.isJson;
 				}
 				Endianness endianness;
 				if (set.has("endian")) {
@@ -447,7 +448,11 @@ public class CommandProcessor implements Completer, Highlighter {
 					compression = fileInfo.compressionMethod;
 				}
 				if (compression == null) {
-					throw new CommandException(VALUE_CMDSPECIFIC_1, "No compression format specified, please specify one with -c");
+					if (json) {
+						compression = Compression.NONE;
+					} else {
+						throw new CommandException(VALUE_CMDSPECIFIC_1, "No compression format specified, please specify one with -c");
+					}
 				}
 				File outFile;
 				if (fileInfo.sourceFile == FileInfo.STDIN) {
@@ -466,15 +471,60 @@ public class CommandProcessor implements Completer, Highlighter {
 				if (outFile == null) {
 					throw new CommandException(VALUE_CMDSPECIFIC_2, "No file specified");
 				}
-				try {
-					DataOutput out = endianness.wrap(compression.wrap(new FileOutputStream(outFile)));
-					try (Closeable c = (Closeable)out) {
-						if (!(root instanceof NBTCompound)) {
-							System.err.println("unbted: save: warning: NBT files with non-compound roots are poorly supported");
+				if (!set.has("force")) {
+					if (json) {
+						 if (outFile.getName().endsWith(".dat") || outFile.getName().endsWith(".nbt")) {
+							if (!prompt("You are saving a JSON file with an NBT extension. Are you sure you want to do this?", false)) {
+								return;
+							}
+						} else if (compression == Compression.DEFLATE) {
+							if (!prompt("You are saving a JSON file with DEFLATE compression. This generally does not make sense. Are you sure you want to do this?", true)) {
+								return;
+							}
+						} else if (compression == Compression.GZIP) {
+							if (!outFile.getName().endsWith(".json.gz")) {
+								if (!prompt("You are saving a gzipped JSON file with an extension other than .json.gz. Are you sure you want to do this?", false)) {
+									return;
+								}
+							}
+						} else {
+							if (!outFile.getName().endsWith(".json")) {
+								if (!prompt("You are saving a JSON file with an extension other than .json. Are you sure you want to do this?", false)) {
+									return;
+								}
+							}
 						}
-						NBTIO.writeTag(out, root);
+					} else {
+						if (outFile.getName().endsWith(".json.gz") || outFile.getName().endsWith(".json")) {
+							if (!prompt("You are saving an NBT file with a JSON extension. Are you sure you want to do this?", false)) {
+								return;
+							}
+						} else if (!outFile.getName().endsWith(".dat") && !outFile.getName().endsWith(".nbt")) {
+							if (!prompt("You are saving an NBT file with a nonstandard extension. Are you sure you want to do this?", true)) {
+								return;
+							}
+						}
+					}
+				}
+				try {
+					try (OutputStream out = compression.wrap(new FileOutputStream(outFile))) {
+						if (json) {
+							try (OutputStreamWriter osw = new OutputStreamWriter(out, Charsets.UTF_8)) {
+								JsonObject obj = new JsonObject();
+								obj.addProperty("_unbted", 1);
+								obj.addProperty("rootType", NBTEd.getTypePrefix(root));
+								obj.addProperty("rootName", root.getName());
+								obj.add("root", NBTEd.toJson(root, true));
+								NBTEd.gson.toJson(obj, osw);
+							}
+						} else {
+							if (!(root instanceof NBTCompound)) {
+								System.err.println("unbted: save: warning: NBT files with non-compound roots are poorly supported");
+							}
+							NBTIO.writeTag(endianness.wrap(out), root);
+						}
 						if (fileInfo.sourceFile == null || outFile == fileInfo.sourceFile || set.has("default")) {
-							fileInfo = new FileInfo(outFile, compression, false, endianness);
+							fileInfo = new FileInfo(outFile, compression, false, endianness, json);
 						}
 						dirty = false;
 					}
@@ -567,11 +617,11 @@ public class CommandProcessor implements Completer, Highlighter {
 					dirty = true;
 					return;
 				}
-				ResolvedPath p = resolvePath(path, CREATE_PARENTS, SOFT_IOOBE);
 				String pathNoTrailingSlashes = path;
 				while (pathNoTrailingSlashes.endsWith("/")) {
 					pathNoTrailingSlashes = pathNoTrailingSlashes.substring(0, pathNoTrailingSlashes.length()-1);
 				}
+				ResolvedPath p = resolvePath(path, CREATE_PARENTS, SOFT_IOOBE);
 				if (p.leaf == null && explicitType == null) {
 					ResolvedPath maybe = resolvePath(pathNoTrailingSlashes+"Most", NO_ERROR);
 					if (maybe.leaf != null && maybe.leaf instanceof NBTLong) {
@@ -592,32 +642,52 @@ public class CommandProcessor implements Completer, Highlighter {
 					commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Least", Long.toString(u.getLeastSignificantBits()));
 					return;
 				}
-				if (p.leaf != null && !(p.immediateParent instanceof NBTList)) {
+				if (p.leaf != null && !(p.immediateParent instanceof NBTIndexed)) {
 					if (noOverwrite) {
 						throw new CommandException(VALUE_WONT_OVERWRITE, "Refusing to overwrite existing tag");
 					}
-					if (explicitType != null && explicitType != p.leaf.getClass()) {
-						throw new CommandException(VALUE_CMDSPECIFIC_1, "Explicit type "+NBTRegistry.typeNameFromClass(explicitType)+" is incompatible with existing type "+NBTRegistry.typeNameFromClass(p.leaf.getClass()));
-					}
-					try {
-						parseAndSet(p.leaf, str);
-						dirty = true;
-					} catch (NumberFormatException e) {
-						throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
+					if (p.leaf instanceof NBTIndexed && shift) {
+						NBTIndexed idx = (NBTIndexed)p.leaf;
+						if (explicitType != null && explicitType != idx.getElementType()) {
+							throw new CommandException(VALUE_CMDSPECIFIC_1, "Explicit type "+NBTRegistry.typeNameFromClass(explicitType)+" is incompatible with list type "+NBTRegistry.typeNameFromClass(idx.getElementType()));
+						}
+						if (explicitType == null && idx.getElementType() == null) {
+							throw new CommandException(VALUE_CMDSPECIFIC_1, "Must specify an explicit type to add an initial tag to a list");
+						}
+						NBTTag tag = NBTRegistry.createInstance(idx.getElementType(), "");
+						try {
+							parseAndSet(tag, str);
+						} catch (NumberFormatException e) {
+							throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
+						}
+						idx.add(tag);
+					} else {
+						if (explicitType != null && explicitType != p.leaf.getClass()) {
+							throw new CommandException(VALUE_CMDSPECIFIC_1, "Explicit type "+NBTRegistry.typeNameFromClass(explicitType)+" is incompatible with existing type "+NBTRegistry.typeNameFromClass(p.leaf.getClass()));
+						}
+						try {
+							parseAndSet(p.leaf, str);
+							dirty = true;
+						} catch (NumberFormatException e) {
+							throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
+						}
 					}
 				} else if (p.immediateParent != null) {
+					if (explicitType == null && p.immediateParent instanceof NBTIndexed) {
+						explicitType = ((NBTIndexed)p.immediateParent).getElementType();
+					}
 					if (explicitType == null) {
 						throw new CommandException(VALUE_CMDSPECIFIC_3, "An explicit type must be specified to create new tags");
 					}
 					String name = path.substring(p.parentPath.length());
-					NBTTag tag = NBTRegistry.createInstance(explicitType, p.immediateParent instanceof NBTList ? "" : name);
+					NBTTag tag = NBTRegistry.createInstance(explicitType, p.immediateParent instanceof NBTIndexed ? "" : name);
 					try {
 						parseAndSet(tag, str);
 					} catch (NumberFormatException e) {
 						throw new CommandException(VALUE_CMDSPECIFIC_2, "Invalid number "+str);
 					}
-					if (p.immediateParent instanceof NBTList) {
-						NBTList li = (NBTList)p.immediateParent;
+					if (p.immediateParent instanceof NBTIndexed) {
+						NBTIndexed li = (NBTIndexed)p.immediateParent;
 						Integer idx = Ints.tryParse(name.endsWith("]") ? name.substring(0, name.length()-1) : name);
 						if (idx == null || idx < 0) {
 							throw new CommandException(VALUE_TAG_NOT_FOUND, name+" is not a valid list index");
@@ -646,6 +716,33 @@ public class CommandProcessor implements Completer, Highlighter {
 			}));
 	}
 	
+	private boolean prompt(String str, boolean def) {
+		try {
+			reader.setOpt(Option.DISABLE_HIGHLIGHTER);
+			reader.unsetOpt(Option.ERASE_LINE_ON_FINISH);
+			while (true) {
+				String line = reader.readLine(str+(def ? " [Y/n] " : " [y/N] "));
+				if (line.trim().isEmpty()) line = def ? "y" : "n";
+				switch (line.charAt(0)) {
+					case 'n':
+					case 'N':
+						return false;
+					case 'y':
+					case 'Y':
+						return true;
+					default:
+						System.err.println("Unrecognized choice "+line+". Enter Y or N.");
+						break;
+				}
+			}
+		} catch (UserInterruptException | EndOfFileException e) {
+			return false;
+		} finally {
+			reader.unsetOpt(Option.DISABLE_HIGHLIGHTER);
+			reader.setOpt(Option.ERASE_LINE_ON_FINISH);
+		}
+	}
+
 	private void parseAndSet(NBTTag tag, String str) {
 		if (tag instanceof NBTNumber) {
 			if ("true".equals(str)) {
@@ -668,6 +765,12 @@ public class CommandProcessor implements Completer, Highlighter {
 			((NBTDouble)tag).setValue(Double.parseDouble(str));
 		} else if (tag instanceof NBTString) {
 			((NBTString)tag).setValue(str);
+		} else if (tag instanceof NBTByteArray) {
+			try {
+				((NBTByteArray)tag).setValue(BaseEncoding.base64().decode(str));
+			} catch (IllegalArgumentException e) {
+				throw new CommandException(VALUE_BAD_USAGE, "Invalid base64");
+			}
 		} else if (!str.trim().isEmpty()) {
 			throw new CommandException(VALUE_BAD_USAGE, "Tags of type "+NBTRegistry.typeNameFromClass(tag.getClass())+" cannot be created with a value");
 		} else if (tag instanceof NBTParent) {
@@ -779,7 +882,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				if ("..".equals(seg)) {
 					if (cursorWork == null) throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse above nothing");
 					if (cursorWork.getParent() == null) throw new CommandException(VALUE_TAG_NOT_FOUND, "Cannot traverse above root");
-					cursorWork = cursorWork.getParent();
+					cursorWork = asTag(cursorWork.getParent());
 					immediateParent = cursorWork.getParent();
 					parentPath = path.substring(0, m.start());
 					continue;
@@ -801,8 +904,8 @@ public class CommandProcessor implements Completer, Highlighter {
 							throw new CommandException(VALUE_TAG_NOT_FOUND, path.substring(0, m.end()).replace("/[", "[").replace("//", "/")+" does not exist");
 						}
 					}
-				} else if (cursorWork instanceof NBTList) {
-					NBTList l = (NBTList)cursorWork;
+				} else if (cursorWork instanceof NBTIndexed) {
+					NBTIndexed l = (NBTIndexed)cursorWork;
 					Integer i = Ints.tryParse(seg);
 					immediateParent = l;
 					parentPath = path.substring(0, m.start());
@@ -903,14 +1006,16 @@ public class CommandProcessor implements Completer, Highlighter {
 		List<String> parts = Lists.newArrayList();
 		while (t != null) {
 			NBTParent parent = t.getParent();
-			if (parent instanceof NBTList) {
+			if (t instanceof NBTArrayFake) {
+				parts.add("["+((NBTArrayFake)t).getIndex()+"]");
+			} else if (parent instanceof NBTList) {
 				parts.add("["+((NBTList)parent).indexOf(t)+"]");
 			} else if (parent instanceof NBTCompound) {
 				parts.add("/"+t.getName());
 			} else {
 				parts.add(t.getName());
 			}
-			t = parent;
+			t = asTag(parent);
 		}
 		if (parts.isEmpty()) {
 			return "(empty file)";
@@ -923,6 +1028,7 @@ public class CommandProcessor implements Completer, Highlighter {
 		}
 	}
 	
+
 	public void stop() throws Exception {
 		if (!running) return;
 		running = false;
@@ -1020,6 +1126,11 @@ public class CommandProcessor implements Completer, Highlighter {
 		matcher.appendTail(scratch);
 		asb.append(scratch, basicStyle);
 		return asb.toAttributedString();
+	}
+	
+	private NBTTag asTag(NBTParent parent) {
+		// always safe
+		return (NBTTag)parent;
 	}
 
 }

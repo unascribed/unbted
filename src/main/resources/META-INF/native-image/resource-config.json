@@ -1,0 +1,8 @@
+{
+  "resources":[
+    {"pattern":"\\Qorg/jline/utils/capabilities.txt\\E"}, 
+    {"pattern":"\\Qorg/jline/utils/xterm-256color.caps\\E"}, 
+    {"pattern":"\\Qversion.txt\\E"}
+  ],
+  "bundles":[{"name":"joptsimple.ExceptionMessages"}]
+}

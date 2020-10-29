@@ -29,6 +29,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
+import com.google.common.io.BaseEncoding;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonWriter;
@@ -396,7 +398,11 @@ public class TagPrinter {
 			}
 			printBasic(tag, tag.stringValue(), tag.getName(), "string", AnsiCode.FG_RED, prefix, values);
 		} else if (tag instanceof NBTByteArray) {
-			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			if (infer && ((NBTByteArray)tag).size() > 32) {
+				printBasic(tag, BaseEncoding.base64().encode(((NBTByteArray) tag).getValue()), tag.getName(), "~base64", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			} else {
+				printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			}
 		} else if (tag instanceof NBTIntArray) {
 			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		} else if (tag instanceof NBTLongArray) {

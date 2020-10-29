@@ -28,7 +28,7 @@ import java.io.IOException;
 
 import io.github.steveice10.opennbt.tag.NBTTag;
 
-public final class NBTByte extends NBTNumber implements Comparable<NBTByte> {
+public class NBTByte extends NBTNumber implements Comparable<NBTByte> {
 	private byte value;
 
 	public NBTByte(String name) {
@@ -40,19 +40,23 @@ public final class NBTByte extends NBTNumber implements Comparable<NBTByte> {
 		this.value = value;
 	}
 
-	@Override
-	public Byte numberValue() {
-		return this.value;
+	protected byte getValue() {
+		return value;
 	}
 	
-	@Override public byte byteValue() { return this.value; }
-	@Override public short shortValue() { return this.value; }
-	@Override public int intValue() { return this.value; }
-	@Override public long longValue() { return this.value; }
-	@Override public float floatValue() { return this.value; }
-	@Override public double doubleValue() { return this.value; }
-	@Override public String stringValue() { return Byte.toString(this.value); }
-
+	@Override
+	public Byte numberValue() {
+		return this.getValue();
+	}
+	
+	@Override public byte byteValue() { return this.getValue(); }
+	@Override public short shortValue() { return this.getValue(); }
+	@Override public int intValue() { return this.getValue(); }
+	@Override public long longValue() { return this.getValue(); }
+	@Override public float floatValue() { return this.getValue(); }
+	@Override public double doubleValue() { return this.getValue(); }
+	@Override public String stringValue() { return Byte.toString(this.getValue()); }
+	
 	public void setValue(byte value) {
 		this.value = value;
 	}
@@ -64,27 +68,27 @@ public final class NBTByte extends NBTNumber implements Comparable<NBTByte> {
 
 	@Override
 	public void write(DataOutput out) throws IOException {
-		out.writeByte(this.value);
+		out.writeByte(this.getValue());
 	}
 
 	@Override
 	public int compareTo(NBTByte that) {
-		return Byte.compare(this.value, that.value);
+		return Byte.compare(this.getValue(), that.getValue());
 	}
 	
 	@Override
 	protected boolean equalsChecked(NBTTag that) {
-		return this.value == ((NBTByte)that).value;
+		return this.getValue() == ((NBTByte)that).getValue();
 	}
 
 	@Override
 	public int hashCode() {
-		return Byte.hashCode(value);
+		return Byte.hashCode(getValue());
 	}
 
 	@Override
 	public String toString() {
-		return "NBTByte[value="+value+"]";
+		return "NBTByte[value="+getValue()+"]";
 	}
-	
+
 }

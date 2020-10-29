@@ -28,7 +28,7 @@ import java.io.IOException;
 
 import io.github.steveice10.opennbt.tag.NBTTag;
 
-public final class NBTInt extends NBTNumber implements Comparable<NBTInt> {
+public class NBTInt extends NBTNumber implements Comparable<NBTInt> {
 	private int value;
 
 	public NBTInt(String name) {
@@ -40,18 +40,22 @@ public final class NBTInt extends NBTNumber implements Comparable<NBTInt> {
 		this.value = value;
 	}
 
+	protected int getValue() {
+		return value;
+	}
+
 	@Override
 	public Integer numberValue() {
-		return this.value;
+		return this.getValue();
 	}
 	
-	@Override public byte byteValue() { return (byte)this.value; }
-	@Override public short shortValue() { return (short)this.value; }
-	@Override public int intValue() { return this.value; }
-	@Override public long longValue() { return this.value; }
-	@Override public float floatValue() { return this.value; }
-	@Override public double doubleValue() { return this.value; }
-	@Override public String stringValue() { return Integer.toString(this.value); }
+	@Override public byte byteValue() { return (byte)this.getValue(); }
+	@Override public short shortValue() { return (short)this.getValue(); }
+	@Override public int intValue() { return this.getValue(); }
+	@Override public long longValue() { return this.getValue(); }
+	@Override public float floatValue() { return this.getValue(); }
+	@Override public double doubleValue() { return this.getValue(); }
+	@Override public String stringValue() { return Integer.toString(this.getValue()); }
 
 	public void setValue(int value) {
 		this.value = value;
@@ -64,27 +68,27 @@ public final class NBTInt extends NBTNumber implements Comparable<NBTInt> {
 
 	@Override
 	public void write(DataOutput out) throws IOException {
-		out.writeInt(this.value);
+		out.writeInt(this.getValue());
 	}
 	
 	@Override
 	public int compareTo(NBTInt that) {
-		return Integer.compare(this.value, that.value);
+		return Integer.compare(this.getValue(), that.getValue());
 	}
 	
 	@Override
 	protected boolean equalsChecked(NBTTag that) {
-		return this.value == ((NBTInt)that).value;
+		return this.getValue() == ((NBTInt)that).getValue();
 	}
 
 	@Override
 	public int hashCode() {
-		return Integer.hashCode(value);
+		return Integer.hashCode(getValue());
 	}
 
 	@Override
 	public String toString() {
-		return "NBTInt[value="+value+"]";
+		return "NBTInt[value="+getValue()+"]";
 	}
 	
 }

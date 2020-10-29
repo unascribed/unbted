@@ -26,10 +26,17 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 
+import com.google.common.collect.AbstractIterator;
+import com.google.common.primitives.Ints;
+
+import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.support.NBTFakeInt;
+import io.github.steveice10.opennbt.tag.number.NBTInt;
 
-public class NBTIntArray extends NBTArray {
+public class NBTIntArray extends NBTArray implements NBTParent {
 	private int[] value;
 
 	public NBTIntArray(String name) {
@@ -64,11 +71,6 @@ public class NBTIntArray extends NBTArray {
 	}
 
 	@Override
-	public int length() {
-		return this.value.length;
-	}
-
-	@Override
 	public void read(DataInput in) throws IOException {
 		this.value = new int[in.readInt()];
 		for (int i = 0; i < this.value.length; i++) {
@@ -97,6 +99,92 @@ public class NBTIntArray extends NBTArray {
 	@Override
 	public String toString() {
 		return "NBTIntArray"+Arrays.toString(this.value);
+	}
+	
+	@Override
+	public Class<? extends NBTTag> getElementType() {
+		return NBTInt.class;
+	}
+
+	@Override
+	public Iterator<NBTTag> iterator() {
+		return new AbstractIterator<NBTTag>() {
+			private int idx = -1;
+			
+			@Override
+			protected NBTTag computeNext() {
+				idx++;
+				if (idx >= value.length) return endOfData();
+				return new NBTFakeInt(NBTIntArray.this, idx);
+			}
+		};
+	}
+	
+	@Override
+	public NBTFakeInt get(int idx) {
+		if (idx < 0 || idx >= value.length) throw new ArrayIndexOutOfBoundsException(idx);
+		return new NBTFakeInt(this, idx);
+	}
+	
+	@Override
+	public boolean add(int idx, NBTTag tag) {
+		if (tag instanceof NBTInt) {
+			int[] lhs = Arrays.copyOfRange(value, 0, idx);
+			int[] mid = new int[] {((NBTInt) tag).intValue()};
+			int[] rhs = Arrays.copyOfRange(value, idx, value.length);
+			value = Ints.concat(lhs, mid, rhs);
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public boolean add(NBTTag tag) {
+		if (tag instanceof NBTInt) {
+			value = Arrays.copyOf(value, value.length+1);
+			value[value.length-1] = ((NBTInt) tag).intValue();
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public NBTTag set(int idx, NBTTag tag) {
+		if (tag instanceof NBTInt) {
+			int orig = value[idx];
+			value[idx] = ((NBTInt) tag).intValue();
+			return new NBTInt("", orig);
+		}
+		throw new ClassCastException(tag.getClass().getSimpleName()+" is not NBTInt");
+	}
+
+	@Override
+	public boolean remove(NBTTag tag) {
+		if (tag instanceof NBTFakeInt) {
+			NBTFakeInt nfb = (NBTFakeInt)tag;
+			if (nfb.getParent() == this) {
+				int[] lhs = Arrays.copyOfRange(value, 0, nfb.getIndex());
+				int[] rhs = Arrays.copyOfRange(value, nfb.getIndex()+1, value.length);
+				value = Ints.concat(lhs, rhs);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public int size() {
+		return value.length;
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return value.length == 0;
+	}
+
+	@Override
+	public void clear() {
+		value = new int[0];
 	}
 	
 }

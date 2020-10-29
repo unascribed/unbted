@@ -94,6 +94,10 @@ set, put, create, new, add
 	values, exponent notation, and the special values NaN, -Infinity,
 	and Infinity. Octal floats are not supported.
 	
+	Byte arrays support Base64 data. If you want to specify decimal
+	numbers, create an empty byte array and set its children using
+	index syntax.
+	
 	Type is required if the value does not already exist.
 	
 	If there is no root tag yet, the path is instead the name of the
@@ -108,17 +112,20 @@ set, put, create, new, add
 		Specifies the type of value that will be set. Required if the
 		type cannot be inferred, such as when setting an initial value
 		in a list or when creating a new tag.
-		Valid types: byte, short, int, long, float, double, string.
+		Valid types: byte, short, int, long, float, double, string,
+		byte-array.
 		If no data is specified, additional types are: compound, list,
-		byte-array, int-array, long-array.
+		int-array, long-array.
 		Additionally, the false type uuid may be specified, which will
 		set two long values, one suffixed with Most, the other suffixed
 		with Least, containing the most-significant 64 bits of the UUID
 		and the least-significant 64 bits, respectively.
 	--shift
-		When setting values in a list, move all later values forward by
-		one, instead of overwriting the existing value at the given
-		index. Implied if the command is invoked as add.
+		When setting values in a list or array, move all later values
+		forward by one, instead of overwriting the existing value
+		at the given index. Implied if the command is invoked as add.
+		Also, if the path points directly to list or array rather than
+		a child thereof, append the tag to the end of the list.
 	--no-overwrite
 		Throw an error when attempting to overwrite. Implied if the
 		command is invoked as create or new.
@@ -143,6 +150,11 @@ save
 	file.
 	
 	Options:
+	-J, -j, --roundtrip-json, --json
+		Override the save format to be unbted's roundtrippable NBT
+		JSON format.
+	-N, --nbt
+		Override the save format to be the normal NBT format.
 	-c=<method>, --compression=<method>
 		Override the compression method used. Valid values are None,
 		Deflate, and GZip. GZip is the most common. Required on new
@@ -151,7 +163,8 @@ save
 	--endian=<endianness>
 		Write a <endianness>-endian file instead of the default.
 		See the program help for more information about why unbted
-		supports little-endian NBT.
+		supports little-endian NBT. Only valid if the format is
+		NBT.
 		Valid endiannesses are Big and Little. (case-insensitive)
 	--little-endian
 		Alias for --endian=little
@@ -160,6 +173,8 @@ save
 	-d, --default
 		Update the default file, compression method, and endianness
 		to those specified.
+	-f, --force
+		Don't ask questions, just do it.
 
 info
 	No arguments.

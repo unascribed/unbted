@@ -26,10 +26,17 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 
+import com.google.common.collect.AbstractIterator;
+import com.google.common.primitives.Bytes;
+
+import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTTag;
+import io.github.steveice10.opennbt.tag.array.support.NBTFakeByte;
+import io.github.steveice10.opennbt.tag.number.NBTByte;
 
-public class NBTByteArray extends NBTArray {
+public class NBTByteArray extends NBTArray implements NBTParent {
 	private byte[] value;
 
 	public NBTByteArray(String name) {
@@ -64,11 +71,6 @@ public class NBTByteArray extends NBTArray {
 	}
 
 	@Override
-	public int length() {
-		return this.value.length;
-	}
-
-	@Override
 	public void read(DataInput in) throws IOException {
 		this.value = new byte[in.readInt()];
 		in.readFully(this.value);
@@ -93,6 +95,92 @@ public class NBTByteArray extends NBTArray {
 	@Override
 	public String toString() {
 		return "NBTByteArray"+Arrays.toString(this.value);
+	}
+	
+	@Override
+	public Class<? extends NBTTag> getElementType() {
+		return NBTByte.class;
+	}
+
+	@Override
+	public Iterator<NBTTag> iterator() {
+		return new AbstractIterator<NBTTag>() {
+			private int idx = -1;
+			
+			@Override
+			protected NBTTag computeNext() {
+				idx++;
+				if (idx >= value.length) return endOfData();
+				return new NBTFakeByte(NBTByteArray.this, idx);
+			}
+		};
+	}
+	
+	@Override
+	public NBTFakeByte get(int idx) {
+		if (idx < 0 || idx >= value.length) throw new ArrayIndexOutOfBoundsException(idx);
+		return new NBTFakeByte(this, idx);
+	}
+	
+	@Override
+	public boolean add(int idx, NBTTag tag) {
+		if (tag instanceof NBTByte) {
+			byte[] lhs = Arrays.copyOfRange(value, 0, idx);
+			byte[] mid = new byte[] {((NBTByte) tag).byteValue()};
+			byte[] rhs = Arrays.copyOfRange(value, idx, value.length);
+			value = Bytes.concat(lhs, mid, rhs);
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public boolean add(NBTTag tag) {
+		if (tag instanceof NBTByte) {
+			value = Arrays.copyOf(value, value.length+1);
+			value[value.length-1] = ((NBTByte) tag).byteValue();
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public NBTTag set(int idx, NBTTag tag) {
+		if (tag instanceof NBTByte) {
+			byte orig = value[idx];
+			value[idx] = ((NBTByte) tag).byteValue();
+			return new NBTByte("", orig);
+		}
+		throw new ClassCastException(tag.getClass().getSimpleName()+" is not NBTByte");
+	}
+
+	@Override
+	public boolean remove(NBTTag tag) {
+		if (tag instanceof NBTFakeByte) {
+			NBTFakeByte nfb = (NBTFakeByte)tag;
+			if (nfb.getParent() == this) {
+				byte[] lhs = Arrays.copyOfRange(value, 0, nfb.getIndex());
+				byte[] rhs = Arrays.copyOfRange(value, nfb.getIndex()+1, value.length);
+				value = Bytes.concat(lhs, rhs);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public int size() {
+		return value.length;
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return value.length == 0;
+	}
+
+	@Override
+	public void clear() {
+		value = new byte[0];
 	}
 	
 }

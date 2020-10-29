@@ -20,13 +20,36 @@
  * SOFTWARE.
  */
 
-package io.github.steveice10.opennbt.tag;
+package io.github.steveice10.opennbt.tag.array.support;
 
-public interface NBTParent extends Iterable<NBTTag> {
+import io.github.steveice10.opennbt.tag.array.NBTIntArray;
+import io.github.steveice10.opennbt.tag.number.NBTInt;
 
-	boolean remove(NBTTag tag);
-	int size();
-	boolean isEmpty();
-	void clear();
+public class NBTFakeInt extends NBTInt implements NBTArrayFake {
+
+	private final NBTIntArray parent;
+	private final int index;
+	
+	public NBTFakeInt(NBTIntArray parent, int index) {
+		super("");
+		this.parent = parent;
+		this.index = index;
+		setParent(parent);
+	}
+	
+	@Override
+	public int getIndex() {
+		return index;
+	}
+	
+	@Override
+	protected int getValue() {
+		return parent.getValue(index);
+	}
+	
+	@Override
+	public void setValue(int value) {
+		parent.setValue(index, value);
+	}
 	
 }
