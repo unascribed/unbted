@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10, 2018 Una Thompson (unascribed)
+ * Copyright (C) 2013-2017 Steveice10, 2018 - 2020 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in

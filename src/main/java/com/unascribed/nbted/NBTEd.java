@@ -1,6 +1,6 @@
 /*
  * unbted - Una's NBT Editor
- * Copyright (C) 2018 Una Thompson (unascribed)
+ * Copyright (C) 2018 - 2020 Una Thompson (unascribed)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -208,7 +208,7 @@ public class NBTEd {
 		if (in == null || in.isEmpty()) {
 			sourceFile = null;
 			inSupplier = null;
-		} else { 
+		} else {
 			if ("-".equals(in)) {
 				byte[] bys = ByteStreams.toByteArray(System.in);
 				inSupplier = () -> new ByteArrayInputStream(bys);
@@ -315,7 +315,7 @@ public class NBTEd {
 						if (endianness == Endianness.ZZAZZ) {
 							System.err.print(" (Maybe it's not in a joke format?)");
 						} else {
-							System.err.print(" (Maybe it's "); 
+							System.err.print(" (Maybe it's ");
 							System.err.print(endianness == Endianness.LITTLE ? "big" : "little");
 							System.err.print("-endian?)");
 						}
@@ -346,8 +346,8 @@ public class NBTEd {
 		}
 		if (!set.has("print")) {
 			System.err.println("Una's NBT Editor v"+VERSION);
-			System.err.println("Copyright (C) 2018 Una Thompson (unascribed)");
-			System.err.println("This program comes with ABSOLUTELY NO WARRANTY; for details type `warranty`."); 
+			System.err.println("Copyright (C) 2018 - 2020 Una Thompson (unascribed)");
+			System.err.println("This program comes with ABSOLUTELY NO WARRANTY; for details type `warranty`.");
 			System.err.println("This is free software, and you are welcome to redistribute it under certain");
 			System.err.println("conditions; type `copying` for details.");
 			System.err.println();

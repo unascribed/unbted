@@ -52,7 +52,7 @@ Both emit jars into `build/libs`.
 ## License
 ```
 unbted - Una's NBT Editor
-Copyright (C) 2018 Una Thompson (unascribed)
+Copyright (C) 2018 - 2020 Una Thompson (unascribed)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
