@@ -1,4 +1,4 @@
-<a href="https://asciinema.org/a/syF7agJRfqjAqhPrXkPhUHBiq"><img width="320px" align="right" src="https://asciinema.org/a/syF7agJRfqjAqhPrXkPhUHBiq.png"/></a>
+<a href="https://asciinema.org/a/201725" target="_blank"><img width="320" align="right" src="https://asciinema.org/a/201725.svg" /></a>
 # Una's NBT Editor
 
 unbted (**U**na's **NBT** **Ed**itor) is a command-line interactive NBT editor. That's about it, really.
