@@ -2,4 +2,7 @@
 cd build/libs
 native-image --libc=musl --static -jar unbted-$1.jar
 strip unbted-$1
-mv unbted-$1 unbted-$1-$(uname -m)
+fin=unbted-$1-$(uname -m)
+mv unbted-$1 $fin
+gzip -k9 $fin
+xz -k9 $fin
