@@ -27,6 +27,9 @@ import java.io.DataOutput;
 import java.io.IOException;
 import com.google.common.base.Objects;
 
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
+
 public class NBTString extends NBTTag implements Comparable<NBTString> {
 	private String value;
 
@@ -56,6 +59,44 @@ public class NBTString extends NBTTag implements Comparable<NBTString> {
 	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeUTF(this.value);
+	}
+
+	@Override
+	public void destringify(StringifiedNBTReader in) throws IOException {
+		String s = in.readNextSingleValueString();
+		if (s.charAt(0) == '"') {
+			value = s.substring(1, s.length() - 1).replaceAll("\\\\\"", "\"");
+		} else if (s.charAt(0) == '\'') {
+			value = s.substring(1, s.length() - 1).replaceAll("\\\\\'", "'");
+		} else {
+			value = s;
+		}
+	}
+
+	@Override
+	public void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException {
+		if (value.matches("(?!\\d+)[\\w\\d]*")) {
+			out.append(value);
+			return;
+		}
+		if (value.contains("\"")) {
+			if (value.contains("'")) {
+				StringBuilder sb = new StringBuilder("\"");
+				sb.append(value.replaceAll("\"", "\\\\\""));
+				sb.append("\"");
+				out.append(sb.toString());
+				return;
+			}
+			StringBuilder sb = new StringBuilder("'");
+			sb.append(value);
+			sb.append("'");
+			out.append(sb.toString());
+			return;
+		}
+		StringBuilder sb = new StringBuilder("\"");
+		sb.append(value);
+		sb.append("\"");
+		out.append(sb.toString());
 	}
 
 	@Override

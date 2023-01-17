@@ -32,6 +32,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import io.github.steveice10.opennbt.NBTIO;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
 
 import java.util.Set;
 
@@ -144,6 +146,52 @@ public class NBTCompound extends NBTTag implements NBTParent {
 			NBTIO.writeTag(out, tag);
 		}
 		out.writeByte(0);
+	}
+    
+	@Override
+	public void destringify(StringifiedNBTReader in) throws IOException {
+		in.readSkipWhitespace();
+		while (true) {
+			String tagName = "";
+			if ((tagName += in.readSkipWhitespace()).equals("\"")) {
+				tagName = in.readUntil(false, '"');
+				in.read();
+			}
+			tagName += in.readUntil(false, ':');
+			in.read();
+
+			put(in.readNextTag(tagName));
+
+			char endChar = in.readSkipWhitespace();
+			if (endChar == ',')
+				continue;
+			if (endChar == '}')
+				break;
+		}
+	}
+
+	@Override
+	public void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException {
+		out.append('{');
+
+		boolean first = true;
+		for (NBTTag t : map.values()) {
+			if (first) {
+				first = false;
+			} else {
+				out.append(',');
+				if (!linebreak) {
+					out.append(' ');
+				}
+			}
+			out.writeTag(t, linebreak, depth + 1);
+		}
+
+		if (linebreak) {
+			out.append('\n');
+			out.indent(depth);
+		}
+		out.append('}');
 	}
 	
 	@Override

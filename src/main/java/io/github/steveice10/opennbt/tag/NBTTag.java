@@ -26,6 +26,9 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
+
 /**
  * All tags must have a constructor that accepts (String, NBTParent) for
  * reflective construction during file load.
@@ -63,6 +66,18 @@ public abstract class NBTTag {
 
 	public abstract void read(DataInput in) throws IOException;
 	public abstract void write(DataOutput out) throws IOException;
+
+	/**
+	 * Parses this tag from stringified NBT.
+	 *
+	 * @param in String to parse.
+	 */
+	public abstract void destringify(StringifiedNBTReader in) throws IOException;
+
+	/**
+	 * Write this tag as stringified NBT.
+	 */
+	public abstract void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException;
 
 	@Override
 	public boolean equals(Object obj) {

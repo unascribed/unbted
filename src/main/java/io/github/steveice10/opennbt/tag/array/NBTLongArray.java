@@ -31,6 +31,8 @@ import java.util.Iterator;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.primitives.Longs;
 
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
 import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTTag;
 import io.github.steveice10.opennbt.tag.array.support.NBTFakeLong;
@@ -84,6 +86,29 @@ public class NBTLongArray extends NBTArray implements NBTParent {
 		for (int i = 0; i < this.value.length; i++) {
 			out.writeLong(this.value[i]);
 		}
+	}
+
+	@Override
+	public void destringify(StringifiedNBTReader in) throws IOException {
+		String s = in.readUntil(true, ']');
+		String[] valueStrings = s.substring(s.indexOf(';') + 1, s.length() - 1).replaceAll(" ", "").split(",");
+		value = new long[valueStrings.length];
+		for (int i = 0; i < value.length; i++) {
+			value[i] = Long.parseLong(valueStrings[i]);
+		}
+	}
+
+	@Override
+	public void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException {
+		StringBuilder sb = new StringBuilder("[L; ");
+		for (long b : value) {
+			sb.append(b);
+			sb.append(',');
+			sb.append(' ');
+		}
+		sb.setLength(sb.length() - 2);
+		sb.append(']');
+		out.append(sb.toString());
 	}
 	
 	@Override

@@ -26,6 +26,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
 import io.github.steveice10.opennbt.tag.NBTTag;
 
 public class NBTInt extends NBTNumber implements Comparable<NBTInt> {
@@ -69,6 +71,19 @@ public class NBTInt extends NBTNumber implements Comparable<NBTInt> {
 	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeInt(this.getValue());
+	}
+
+	@Override
+	public void destringify(StringifiedNBTReader in) throws IOException {
+		String s = in.readNextSingleValueString();
+		value = Integer.parseInt(s);
+	}
+
+	@Override
+	public void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append(value);
+		out.append(sb.toString());
 	}
 	
 	@Override

@@ -245,9 +245,13 @@ public class NBTIO {
 	 * @throws java.io.IOException If an I/O error occurs.
 	 */
 	public static void writeTag(DataOutput out, NBTTag tag) throws IOException {
-		out.writeByte(NBTRegistry.idForClass(tag.getClass()));
-		out.writeUTF(tag.getName());
-		tag.write(out);
+		if (tag != null) {
+			out.writeByte(NBTRegistry.idForClass(tag.getClass()));
+			out.writeUTF(tag.getName());
+			tag.write(out);
+		} else {
+			out.writeByte(0);
+		}
 	}
 
 	public static class LittleEndianDataInputStream extends FilterInputStream implements DataInput {

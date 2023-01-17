@@ -34,6 +34,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
 import io.github.steveice10.opennbt.NBTRegistry;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTWriter;
 
 public class NBTList extends NBTTag implements NBTParent, NBTIndexed {
 	private Class<? extends NBTTag> type;
@@ -236,6 +238,44 @@ public class NBTList extends NBTTag implements NBTParent, NBTIndexed {
 		for (NBTTag tag : this.list) {
 			tag.write(out);
 		}
+	}
+
+	@Override
+	public void destringify(StringifiedNBTReader in) throws IOException {
+		in.readSkipWhitespace();
+		while (true) {
+			add(in.readNextTag(""));
+
+			char endChar = in.readSkipWhitespace();
+			if (endChar == ',')
+				continue;
+			if (endChar == ']')
+				break;
+		}
+	}
+
+	@Override
+	public void stringify(StringifiedNBTWriter out, boolean linebreak, int depth) throws IOException {
+		out.append('[');
+
+		boolean first = true;
+		for (NBTTag t : list) {
+			if (first) {
+				first = false;
+			} else {
+				out.append(',');
+				if (!linebreak) {
+					out.append(' ');
+				}
+			}
+			out.writeTag(t, linebreak, depth + 1);
+		}
+
+		if (linebreak) {
+			out.append('\n');
+			out.indent(depth);
+		}
+		out.append(']');
 	}
 
 	@Override
