@@ -1,4 +1,5 @@
 Usage: unbted [options] [file]
+       unbted -N [options] <in-file> <out-file>
 
 Una's NBT Editor
 
@@ -50,12 +51,20 @@ Valid options:
 		colored format. The keys in the JSON match those in the NBT 1:1.
 		Cannot be converted back to NBT; type information is lost in the
 		conversion.
+			(incompatible with -J and -N)
 	
 	-J, --roundtrip-json
 		Print out well-formed JSON where the keys are prefixed with the
 		original NBT type. Can be converted back into NBT by invoking
 		unbted with the JSON file as an argument. Can also be generated
 		by the save command in an unbted session.
+			(incompatible with -j and -N)
+	
+	-N, --convert-nbt
+		Convert the given roundtrip JSON file to a binary NBT file, given
+		as a second argument. The --endian and --compression options will
+		be respected.
+			(incompatible with -j and -J)
 	
 	-r, --raw
 		Don't infer types.

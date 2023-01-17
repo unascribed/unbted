@@ -18,8 +18,10 @@
 
 package com.unascribed.nbted;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.text.DecimalFormat;
@@ -66,6 +68,7 @@ import com.unascribed.nbted.TagPrinter.RecurseMode;
 
 import io.github.steveice10.opennbt.NBTIO;
 import io.github.steveice10.opennbt.NBTRegistry;
+import io.github.steveice10.opennbt.SNBTIO.StringifiedNBTReader;
 import io.github.steveice10.opennbt.tag.NBTCompound;
 import io.github.steveice10.opennbt.tag.NBTIndexed;
 import io.github.steveice10.opennbt.tag.NBTList;
@@ -73,6 +76,8 @@ import io.github.steveice10.opennbt.tag.NBTParent;
 import io.github.steveice10.opennbt.tag.NBTString;
 import io.github.steveice10.opennbt.tag.NBTTag;
 import io.github.steveice10.opennbt.tag.array.NBTByteArray;
+import io.github.steveice10.opennbt.tag.array.NBTIntArray;
+import io.github.steveice10.opennbt.tag.array.NBTLongArray;
 import io.github.steveice10.opennbt.tag.array.support.NBTArrayFake;
 import io.github.steveice10.opennbt.tag.number.NBTByte;
 import io.github.steveice10.opennbt.tag.number.NBTDouble;
@@ -297,17 +302,8 @@ public class CommandProcessor implements Completer, Highlighter {
 							// no action can possibly be more destructive than deleting the root, so break
 							break;
 						} else {
-							if (parent instanceof NBTCompound) {
-								NBTCompound ct = (NBTCompound)parent;
-								if (ct.contains(t.getName())) {
-									ct.remove(t.getName());
-									dirty = true;
-								} else {
-									throw new ConsistencyError("Tried to delete tag from parent, but it's not in its parent!?");
-								}
-							} else {
-								throw new CommandException(VALUE_NYI, "Tried to delete tag with non-compound parent (NYI)");
-							}
+							t.removeFromParent();
+							dirty = true;
 						}
 						int idx = contextParents.indexOf(t);
 						if (idx != -1) {
@@ -566,7 +562,8 @@ public class CommandProcessor implements Completer, Highlighter {
 				for (String s : NBTRegistry.allByTypeName().keySet()) {
 					exclusive.add(parser.accepts(s, "equivalent to --type="+s).availableUnless("type"));
 				}
-				exclusive.add(parser.accepts("uuid", "equivalent to --type=uuid").availableUnless("type"));
+				exclusive.add(parser.accepts("olduuid", "equivalent to --type=olduuid").availableUnless("type"));
+				exclusive.add(parser.accepts("newuuid", "equivalent to --type=newuuid").availableUnless("type"));
 				parser.mutuallyExclusive(exclusive.toArray(new OptionSpecBuilder[exclusive.size()]));
 			})
 			.action((alias, set, args) -> {
@@ -577,18 +574,25 @@ public class CommandProcessor implements Completer, Highlighter {
 				if ("add".equals(alias)) shift = true;
 				String path = args.get(0);
 				boolean uuid = false;
+				boolean newuuid = false;
 				Class<? extends NBTTag> explicitType = null;
 				if (set.has("type")) {
 					String typeStr = set.valueOf("type").toString();
-					if ("uuid".equals(typeStr)) {
+					if ("olduuid".equals(typeStr)) {
 						uuid = true;
+					} else if ("newuuid".equals(typeStr)) {
+						uuid = true;
+						newuuid = true;
 					} else {
 						explicitType = NBTRegistry.classByTypeName(typeStr);
 						if (explicitType == null) throw new CommandException(VALUE_BAD_USAGE, "Unrecognized type "+set.valueOf("type"));
 					}
 				} else {
-					if (set.has("uuid")) {
+					if (set.has("olduuid")) {
 						uuid = true;
+					} else if (set.has("newuuid")) {
+						uuid = true;
+						newuuid = true;
 					} else {
 						for (Map.Entry<String, Class<? extends NBTTag>> en : NBTRegistry.allByTypeName().entrySet()) {
 							if (set.has(en.getKey())) {
@@ -600,13 +604,13 @@ public class CommandProcessor implements Completer, Highlighter {
 				}
 				String str = SPACE_JOINER.join(args.subList(1, args.size()));
 				if (root == null) {
-					if (uuid) {
-						throw new CommandException(VALUE_CMDSPECIFIC_4, "UUIDs are actually two tags, and cannot be the root of a file");
+					if (uuid && !newuuid) {
+						throw new CommandException(VALUE_CMDSPECIFIC_4, "Old-style UUIDs are two tags, and cannot be the root of a file");
 					}
-					if (explicitType == null) {
+					if (explicitType == null && !uuid) {
 						throw new CommandException(VALUE_CMDSPECIFIC_3, "An explicit type must be specified to create new tags");
 					}
-					NBTTag tag = NBTRegistry.createInstance(explicitType, path);
+					NBTTag tag = uuid ? new NBTIntArray(path, UUIDs.toIntArray(UUID.fromString(str))) : NBTRegistry.createInstance(explicitType, path);
 					try {
 						parseAndSet(tag, str);
 					} catch (NumberFormatException e) {
@@ -638,8 +642,15 @@ public class CommandProcessor implements Completer, Highlighter {
 					} catch (IllegalArgumentException e) {
 						throw new CommandException(VALUE_BAD_USAGE, str+" is not a valid UUID");
 					}
-					commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Most", Long.toString(u.getMostSignificantBits()));
-					commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Least", Long.toString(u.getLeastSignificantBits()));
+					if (newuuid) {
+						int[] arr = UUIDs.toIntArray(u);
+						commands.get("set").execute("set", "--type=int-array", "--", pathNoTrailingSlashes,
+								Integer.toString(arr[0]), Integer.toString(arr[1]),
+								Integer.toString(arr[2]), Integer.toString(arr[3]));
+					} else {
+						commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Most", Long.toString(u.getMostSignificantBits()));
+						commands.get("set").execute("set", "--type=long", "--", pathNoTrailingSlashes+"Least", Long.toString(u.getLeastSignificantBits()));
+					}
 					return;
 				}
 				if (p.leaf != null && !(p.immediateParent instanceof NBTIndexed)) {
@@ -770,6 +781,28 @@ public class CommandProcessor implements Completer, Highlighter {
 				((NBTByteArray)tag).setValue(BaseEncoding.base64().decode(str));
 			} catch (IllegalArgumentException e) {
 				throw new CommandException(VALUE_BAD_USAGE, "Invalid base64");
+			}
+		} else if (tag instanceof NBTIntArray) {
+			try {
+				((NBTIntArray)tag).setValue(Arrays.stream(str.split(" "))
+						.mapToInt(Integer::parseInt)
+						.toArray());
+			} catch (IllegalArgumentException e) {
+				throw new CommandException(VALUE_BAD_USAGE, "Invalid number "+e.getMessage());
+			}
+		} else if (tag instanceof NBTLongArray) {
+			try {
+				((NBTLongArray)tag).setValue(Arrays.stream(str.split(" "))
+						.mapToLong(Long::parseLong)
+						.toArray());
+			} catch (IllegalArgumentException e) {
+				throw new CommandException(VALUE_BAD_USAGE, "Invalid number "+e.getMessage());
+			}
+		} else if (tag instanceof NBTCompound && !str.trim().isEmpty()) {
+			try {
+				tag.destringify(new StringifiedNBTReader(new ByteArrayInputStream(str.trim().getBytes(Charsets.UTF_8))));
+			} catch (IOException e) {
+				throw new CommandException(VALUE_BAD_USAGE, "SNBT parsing failed: "+e.getMessage());
 			}
 		} else if (!str.trim().isEmpty()) {
 			throw new CommandException(VALUE_BAD_USAGE, "Tags of type "+NBTRegistry.typeNameFromClass(tag.getClass())+" cannot be created with a value");

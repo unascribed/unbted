@@ -22,10 +22,12 @@ import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PushbackInputStream;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
@@ -38,6 +40,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
@@ -177,7 +180,8 @@ public class NBTEd {
 		);
 		parser.mutuallyExclusive(
 			parser.acceptsAll(Arrays.asList("json", "j")),
-			parser.acceptsAll(Arrays.asList("roundtrip-json", "J"))
+			parser.acceptsAll(Arrays.asList("roundtrip-json", "J")),
+			parser.acceptsAll(Arrays.asList("convert-nbt", "N"))
 		);
 		parser.acceptsAll(Arrays.asList("raw", "r"));
 		parser.acceptsAll(Arrays.asList("no-pager"));
@@ -189,14 +193,14 @@ public class NBTEd {
 		try {
 			set = parser.parse(args);
 		} catch (OptionException e) {
-			System.err.println(e.getMessage());
+			System.err.println("unbted: "+e.getMessage());
 			printUsage();
 			System.exit(1);
 			return;
 		}
 		if (set.has("version")) {
 			System.err.println("Una's NBT Editor v"+VERSION);
-			System.err.println("Copyright (C) 2018 - 2022 Una Thompson (unascribed)");
+			System.err.println("Copyright (C) 2018 - 2023 Una Thompson (unascribed)");
 			System.err.println("License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.");
 			System.err.println("This is free software: you are free to change and redistribute it.");
 			System.err.println("There is NO WARRANTY, to the extent permitted by law.");
@@ -215,26 +219,30 @@ public class NBTEd {
 			PAGER = false;
 		}
 		
-		terminal = TerminalBuilder.terminal();
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			try {
-				terminal.close();
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-		}));
-		
 		if (set.has("help")) {
+			initializeTerminal();
 			printHelp();
 			return;
 		}
-		String in = set.valueOf(nonoption);
+		List<String> nonoptions = set.valuesOf(nonoption);
+		if (set.has("convert-nbt")) {
+			if (nonoptions.size() > 2) {
+				System.err.println("unbted: Too many arguments - only two arguments, the input NBT JSON and output NBT files, may be specified");
+				System.exit(1);
+				return;
+			}
+		} else if (nonoptions.size() > 1) {
+			System.err.println("unbted: Too many arguments - only one argument, the input file, may be specified");
+			System.exit(1);
+			return;
+		}
 		File sourceFile;
 		ExceptableSupplier<InputStream, IOException> inSupplier;
-		if (in == null || in.isEmpty()) {
+		if (nonoptions.isEmpty()) {
 			sourceFile = null;
 			inSupplier = null;
 		} else {
+			String in = nonoptions.get(0);
 			if ("-".equals(in)) {
 				byte[] bys = ByteStreams.toByteArray(System.in);
 				inSupplier = () -> new ByteArrayInputStream(bys);
@@ -247,6 +255,58 @@ public class NBTEd {
 				log("Reading from file {}", f);
 			}
 		}
+		
+		if (set.has("convert-nbt")) {
+			if (nonoptions.size() < 2) {
+				System.err.println("unbted: Not enough arguments - need input NBT JSON file and output NBT file");
+				System.exit(1);
+				return;
+			}
+			Compression compression = set.valueOf(compressionOpt);
+			if (compression == null) {
+				System.err.println("unbted: A compression method must be specified for conversion from NBT JSON");
+				System.exit(1);
+				return;
+			}
+			Endianness endianness = Endianness.BIG;
+			if (set.has(endiannessOpt)) {
+				endianness = set.valueOf(endiannessOpt);
+			} else if (set.has("little-endian")) {
+				endianness = Endianness.LITTLE;
+			} else if (set.has("big-endian")) {
+				endianness = Endianness.BIG;
+			}
+			String out = nonoptions.get(1);
+			ExceptableSupplier<OutputStream, IOException> outSupplier;
+			if ("-".equals(out)) {
+				outSupplier = () -> System.out;
+				log("Writing to stdout");
+			} else {
+				File f = new File(out);
+				outSupplier = () -> new FileOutputStream(f);
+				log("Writing to file {}", f);
+			}
+			try {
+				NBTTag tag = loadJson(inSupplier.get());
+				try (OutputStream os = compression.wrap(outSupplier.get())) {
+					NBTIO.writeTag(endianness.wrap(os), tag);
+				} catch (Exception e) {
+					log("Error occurred while writing", e);
+					System.err.println("unbted: Failed to save "+(sourceFile == FileInfo.STDIN ? "(stdin)" : sourceFile.getAbsolutePath()));
+					System.err.println("unbted: Are you sure this is an unbted NBT JSON file?");
+					System.exit(2);
+					return;
+				}
+			} catch (Exception e) {
+				log("Exception while trying to load NBT file", e);
+				System.err.println("unbted: Failed to load "+(sourceFile == FileInfo.STDIN ? "(stdin)" : sourceFile.getAbsolutePath()));
+				System.err.println("unbted: Are you sure this is an unbted NBT JSON file?");
+				System.exit(2);
+				return;
+			}
+			return;
+		}
+		
 		if (set.has("json")) {
 			JSON_MODE = JsonMode.BASIC;
 		} else if (set.has("roundtrip-json")) {
@@ -309,25 +369,7 @@ public class NBTEd {
 					if (firstByte == '{') {
 						isJson = true;
 						log("Detected JSON file");
-						JsonObject json = gson.fromJson(new InputStreamReader(is, Charsets.UTF_8), JsonObject.class);
-						JsonElement unbtedMarker = json.get("_unbted");
-						if (unbtedMarker != null) {
-							int version = unbtedMarker.getAsInt();
-							if (version > 1) {
-								System.err.println("unbted: This looks like an NBT JSON file, but it's of a version newer than I know how to read. ("+version+")");
-								System.err.println("unbted: Aborting.");
-								System.exit(2);
-								return;
-							} else {
-								log("Looks like NBT JSON");
-								tag = fromJson(json.get("rootType").getAsString()+":"+json.get("rootName").getAsString(), json.get("root"));
-							}
-						} else {
-							System.err.println("unbted: This looks like a JSON file, but it's not an NBT JSON file.");
-							System.err.println("unbted: Aborting.");
-							System.exit(2);
-							return;
-						}
+						tag = loadJson(is);
 					} else {
 						log("Detected binary file");
 						if (endianness != null) {
@@ -407,8 +449,9 @@ public class NBTEd {
 			}
 		}
 		if (!set.has("print")) {
+			initializeTerminal();
 			System.err.println("Una's NBT Editor v"+VERSION);
-			System.err.println("Copyright (C) 2018 - 2020 Una Thompson (unascribed)");
+			System.err.println("Copyright (C) 2018 - 2023 Una Thompson (unascribed)");
 			System.err.println("This program comes with ABSOLUTELY NO WARRANTY; for details type `warranty`.");
 			System.err.println("This is free software, and you are welcome to redistribute it under certain");
 			System.err.println("conditions; type `copying` for details.");
@@ -419,6 +462,39 @@ public class NBTEd {
 		}
 	}
 	
+	private static void initializeTerminal() throws IOException {
+		terminal = TerminalBuilder.terminal();
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			try {
+				terminal.close();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}));
+	}
+
+	private static NBTTag loadJson(InputStream is) {
+		JsonObject json = gson.fromJson(new InputStreamReader(is, Charsets.UTF_8), JsonObject.class);
+		JsonElement unbtedMarker = json.get("_unbted");
+		if (unbtedMarker != null) {
+			int version = unbtedMarker.getAsInt();
+			if (version > 1) {
+				System.err.println("unbted: This looks like an NBT JSON file, but it's of a version newer than I know how to read. ("+version+")");
+				System.err.println("unbted: Aborting.");
+				System.exit(2);
+				return null;
+			} else {
+				log("Looks like NBT JSON");
+				return fromJson(json.get("rootType").getAsString()+":"+json.get("rootName").getAsString(), json.get("root"));
+			}
+		} else {
+			System.err.println("unbted: This looks like a JSON file, but it's not an NBT JSON file.");
+			System.err.println("unbted: Aborting.");
+			System.exit(2);
+			return null;
+		}
+	}
+
 	public static String getTypePrefix(NBTTag tag) {
 		if (tag == null) {
 			return "null";
@@ -515,6 +591,21 @@ public class NBTEd {
 				Collections.sort(keys);
 				JsonObject sorted = new JsonObject();
 				for (String k : keys) {
+					if (k.endsWith("Least") && sorted.has(k.replaceFirst("Least$", ""))) {
+						continue;
+					}
+					if (k.endsWith("Most") && out.has(k.replaceFirst("Most$", "Least"))) {
+						String basek = k.replaceFirst("Most$", "");
+						String k2 = basek+"Least";
+						if (out.get(k) instanceof JsonPrimitive && out.get(k2) instanceof JsonPrimitive) {
+							JsonPrimitive p1 = (JsonPrimitive)out.get(k);
+							JsonPrimitive p2 = (JsonPrimitive)out.get(k2);
+							if (p1.isNumber() && p2.isNumber()) {
+								sorted.add(basek, new JsonPrimitive(new UUID(p1.getAsLong(), p2.getAsLong()).toString()));
+								continue;
+							}
+						}
+					}
 					sorted.add(k, out.get(k));
 				}
 				out = sorted;
@@ -534,8 +625,12 @@ public class NBTEd {
 		} else if (tag instanceof NBTByteArray) {
 			return new JsonPrimitive(BaseEncoding.base64().encode(((NBTByteArray)tag).getValue()));
 		} else if (tag instanceof NBTIntArray) {
+			NBTIntArray arr = ((NBTIntArray)tag);
+			if (!roundTrip && arr.size() == 4) {
+				return new JsonPrimitive(UUIDs.fromIntArray(arr.getValue()).toString());
+			}
 			JsonArray out = new JsonArray();
-			for (int v : ((NBTIntArray)tag).getValue()) { out.add(v); }
+			for (int v : arr.getValue()) { out.add(v); }
 			return out;
 		} else if (tag instanceof NBTLongArray) {
 			JsonArray out = new JsonArray();
@@ -558,7 +653,7 @@ public class NBTEd {
 	public static void displayEmbeddedFileInPager(String file) throws Exception {
 		if (PAGER && !"dumb".equals(terminal.getType())) {
 			Less less = new Less(NBTEd.terminal, new File("").toPath());
-			less.run(new URLSource(ClassLoader.getSystemResource(file), file));
+			less.run(Lists.newArrayList(new URLSource(ClassLoader.getSystemResource(file), file)));
 		} else {
 			Resources.copy(ClassLoader.getSystemResource(file), System.err);
 		}

@@ -19,11 +19,12 @@ java -jar /opt/unbted/unbted-1.2.jar "$@"
 
 * ANSI-colorized output for more distinctive and easier to skim output
 * Can convert NBT files to well-formed JSON for processing by anything that can parse JSON
-  * As of 1.1, a special NBT JSON format is supported that can be roundtripped. Want to edit an NBT file with jq? Now you can.
+  * A special NBT JSON format is supported that can be roundtripped. Want to edit an NBT file with jq? Now you can.
 * Support for "inferred" types when printing NBT trees in its default format. This includes:
   * **JSON** - JSON objects such as `generatorOptions` in level.dat will be colorized, indented, and split into multiple lines for easier reading
-  * **UUID** - Pairs of long NBT tags with names ending in `Most` and `Least` will be printed as a UUID
-    * The `set` command also supports UUIDs, which makes working with them easy
+  * **Old-style UUID** - Pairs of long NBT tags with names ending in `Most` and `Least` will be printed as a UUID
+  * **New-style UUID** - Int arrays of length 4 will be decoded into UUIDs
+    * The `set` command supports both forms of UUIDs, which makes working with them easy
   * **Forge registries** - Lists containing compounds with only two children, `K` and `V`, will be printed in a condensed format for easier skimming, and sorted by their value
   * **Booleans** - unbted will try to guess whether or not an NBT byte is a boolean, and if it thinks it is, will print 0 as false and 1 as true.
 * Support for all NBT tags, including int and long arrays
@@ -36,11 +37,11 @@ java -jar /opt/unbted/unbted-1.2.jar "$@"
 * Compression autodetection
 * Written in Java and compiled to a native statically linked executable
 * Support for little-endian legacy Pocket Edition NBT files
+* SNBT (i.e. command block format) support for `set --compound`
 
 ## Planned features
 
 * Anvil file support
-* Mojangson (i.e. command block format) support for `set --compound`
 * Scripting
 
 ## Building

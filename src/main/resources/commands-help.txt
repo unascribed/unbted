@@ -81,8 +81,9 @@ set, put, create, new, add
 	Set a value at the given path, replacing existing values. Parent
 	compounds will be created automatically.
 	
-	Data may be more than one argument. If it is, the arguments will be
-	joined with spaces.
+	Data may be more than one argument. For arrays, each argument will
+	become one value in the resulting array. For compounds and strings,
+	each argument will be joined with a space.
 	
 	Integer types support hexadecimal (0xN), octal (0N), and of course,
 	decimal (N). Integers may additionally be prefixed with a - or a +
@@ -113,13 +114,16 @@ set, put, create, new, add
 		type cannot be inferred, such as when setting an initial value
 		in a list or when creating a new tag.
 		Valid types: byte, short, int, long, float, double, string,
-		byte-array.
-		If no data is specified, additional types are: compound, list,
+		byte-array, compound, int-array, long-array.
+		You may also create these types without data: compound, list,
 		int-array, long-array.
-		Additionally, the false type uuid may be specified, which will
+		Additionally, the false type olduuid may be specified, which will
 		set two long values, one suffixed with Most, the other suffixed
 		with Least, containing the most-significant 64 bits of the UUID
-		and the least-significant 64 bits, respectively.
+		and the least-significant 64 bits, respectively. This is how
+		UUIDs are represented prior to 1.13.
+		The false type newuuid may also be specified, which will set an
+		int array. This is how UUIDs are represented in 1.13 and later.
 	--shift
 		When setting values in a list or array, move all later values
 		forward by one, instead of overwriting the existing value

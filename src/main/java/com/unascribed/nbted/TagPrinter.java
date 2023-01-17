@@ -196,7 +196,7 @@ public class TagPrinter {
 									NBTTag least = ct.get(t.getName().replaceFirst("Most$", "Least"));
 									if (most instanceof NBTLong && least instanceof NBTLong) {
 										UUID u = new UUID(((NBTLong)most).longValue(), ((NBTLong)least).longValue());
-										printBasic(tag, u.toString(), t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW_INTENSE, childPrefix, values);
+										printBasic(tag, u.toString(), t.getName().replaceFirst("Most$", ""), "~uuid", AnsiCode.FG_YELLOW, childPrefix, values);
 										continue;
 									}
 								}
@@ -404,7 +404,12 @@ public class TagPrinter {
 				printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "byte[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 			}
 		} else if (tag instanceof NBTIntArray) {
-			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			NBTIntArray arr = (NBTIntArray)tag;
+			if (infer && arr.size() == 4) {
+				printBasic(tag, UUIDs.fromIntArray(arr.getValue()).toString(), tag.getName(), "~uuid", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			} else {
+				printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "int[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
+			}
 		} else if (tag instanceof NBTLongArray) {
 			printBasic(tag, colorizeArray(tag.stringValue()), tag.getName(), "long[]", AnsiCode.FG_YELLOW_INTENSE, prefix, values);
 		}
