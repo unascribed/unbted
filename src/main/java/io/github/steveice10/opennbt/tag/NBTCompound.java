@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Steveice10, 2018 - 2020 Una Thompson (unascribed)
+ * Copyright (C) 2013-2017 Steveice10, 2018 - 2023 Una Thompson (unascribed)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -41,7 +41,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 
 public class NBTCompound extends NBTTag implements NBTParent {
-	private final Map<String, NBTTag> map = Maps.newHashMap();
+	private final Map<String, NBTTag> map = Maps.newLinkedHashMap();
 
 	public NBTCompound(String name) {
 		super(name);

@@ -3,16 +3,15 @@ buildscript {
 		mavenCentral()
 	}
 	dependencies {
-		classpath 'net.sf.proguard:proguard-gradle:6.0.3'
+		classpath 'com.guardsquare:proguard-gradle:7.3.1'
 	}
 }
 
 plugins {
-	id 'net.minecrell.licenser' version '0.4.1'
+	id 'org.cadixdev.licenser' version '0.6.1'
 }
 
 apply plugin: 'java'
-apply plugin: 'eclipse'
 
 archivesBaseName = 'unbted'
 version = file('version.txt').text.trim()
@@ -22,21 +21,27 @@ repositories {
 }
 
 dependencies {
-	compile('com.google.guava:guava:26.0-jre') {
+	implementation('com.google.guava:guava:31.1-jre') {
 		transitive = false
 	}
-	compile 'com.google.code.gson:gson:2.8.5'
-	compile 'net.sf.jopt-simple:jopt-simple:6.0-alpha-2'
-	compile 'org.jline:jline-terminal:3.9.0'
-	compile 'org.jline:jline-terminal-jansi:3.9.0'
-	compile 'org.jline:jline-reader:3.9.0'
-	compile 'org.jline:jline-builtins:3.9.0'
+	implementation 'com.google.guava:failureaccess:1.0.1'
+	implementation 'com.google.code.gson:gson:2.8.5'
+	implementation 'net.sf.jopt-simple:jopt-simple:6.0-alpha-2'
+	implementation 'org.jline:jline-terminal:3.21.0'
+	implementation 'org.jline:jline-terminal-jansi:3.21.0'
+	implementation 'org.jline:jline-reader:3.21.0'
+	implementation 'org.jline:jline-builtins:3.21.0'
 }
 
 task proguard(type: proguard.gradle.ProGuardTask) {
 	dependsOn compileJava
-	injars project.configurations.compile.plus(sourceSets.main.output)
-	libraryjars files(System.properties["java.home"]+"/lib/rt.jar", System.properties["java.home"]+"/lib/jce.jar")
+	injars sourceSets.main.compileClasspath.plus(sourceSets.main.output)
+	libraryjars files(
+			System.properties["java.home"]+"/jmods/java.base.jmod",
+			System.properties["java.home"]+"/jmods/java.logging.jmod",
+			System.properties["java.home"]+"/jmods/java.management.jmod",
+			System.properties["java.home"]+"/jmods/jdk.unsupported.jmod"
+		)
 	outjars 'build/tmp/proguard.jar'
 	
 	dontoptimize
@@ -51,27 +56,13 @@ task proguard(type: proguard.gradle.ProGuardTask) {
 	dontwarn 'javax.annotation.**'
 	dontwarn 'org.codehaus.mojo.animal_sniffer.**'
 	dontwarn 'org.mozilla.universalchardet.**'
+	dontwarn 'java.sql.**' // gson adapters we don't use
 	
 	verbose
 }
 
-task fatJar(type: Jar) {
-	dependsOn compileJava
-	manifest {
-		attributes (
-			'Main-Class': 'com.unascribed.nbted.NBTEd'
-		)
-	}
-	classifier 'fat'
-	project.configurations.compile.resolve().each {
-		from(zipTree(it))
-		exclude 'META-INF/services/**'
-		exclude 'META-INF/maven/**'
-	}
-	from(sourceSets.main.output)
-}
-
-jar {
+task proguardJar(type: Jar) {
+	dependsOn proguard
 	manifest {
 		attributes (
 			'Main-Class': 'com.unascribed.nbted.NBTEd'
@@ -80,14 +71,10 @@ jar {
 	from(zipTree('build/tmp/proguard.jar'))
 	exclude 'META-INF/services/**'
 	exclude 'META-INF/maven/**'
+	exclude 'META-INF/native-image/**'
 }
 
-task nativeImage(type: Exec) {
-	dependsOn jar
-	inputs.file 'build/libs/unbted-'+project.version+'.jar'
-	outputs.file 'build/libs/unbted-'+project.version+'-'+('uname -m'.execute().text.trim())
-	commandLine './build-native-image.sh', project.version
-}
+jar.enabled = false
 
 license {
 	header = file('HEADER')
@@ -96,4 +83,4 @@ license {
 	}
 }
 
-tasks.jar.dependsOn proguard
+tasks.build.dependsOn proguardJar

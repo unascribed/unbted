@@ -1,6 +1,6 @@
 /*
  * unbted - Una's NBT Editor
- * Copyright (C) 2018 - 2020 Una Thompson (unascribed)
+ * Copyright (C) 2018 - 2023 Una Thompson (unascribed)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -865,12 +865,14 @@ public class CommandProcessor implements Completer, Highlighter {
 		}
 		NBTParent immediateParent = cursorWork == null ? null : cursorWork.getParent();
 		// shhhhhhHHHHHH
+		String slashMagic = "!!@@ThisIsAHopefullyUniqueStringToHackilyFixABugThatIsCausingMajorProblemsRightNow@@!!";
+		path = path.replace("\\/", slashMagic);
 		path = path.replace("/", "//").replace("[", "/[").replace("]//", "]/");
 		Matcher m = PATH_SEGMENT.matcher(path);
 		String parentPath = "";
 		try {
 			while (m.find()) {
-				String seg = MoreObjects.firstNonNull(m.group(1), m.group(2)).replace("//", "/");
+				String seg = MoreObjects.firstNonNull(m.group(1), m.group(2)).replace("//", "/").replace(slashMagic, "/");
 				if (".".equals(seg) || seg.isEmpty()) {
 					// this cast is safe due to checks lower in the loop
 					// we'll never reach this point if cursorWork is not
@@ -1131,6 +1133,16 @@ public class CommandProcessor implements Completer, Highlighter {
 	private NBTTag asTag(NBTParent parent) {
 		// always safe
 		return (NBTTag)parent;
+	}
+
+	@Override
+	public void setErrorPattern(Pattern errorPattern) {
+		
+	}
+
+	@Override
+	public void setErrorIndex(int errorIndex) {
+		
 	}
 
 }

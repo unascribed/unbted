@@ -8,19 +8,12 @@ Since it's command-line, it can be easily used over SSH connections on remote se
 Releases are [here on GitHub](https://github.com/unascribed/unbted/releases).
 
 ## Running
-If you're on an x86_64 Linux system, you can download the native-image build
-from the releases (called something like unbted-1.1-x86_64) and stick it in
-your PATH as "unbted". It acts just like a native executable because, well, it
-is.
-
-You can also use the JAR build (e.g. unbted-1.1.jar) with any JRE. You can then
-put a shell script like the following in your PATH:
+Run the JAR (e.g. unbted-1.2.jar) with any JRE. You can then put a shell script like the following
+in your PATH:
 ```sh
 #!/bin/sh
-java -jar /opt/unbted/unbted-1.1.jar "$@"
+java -jar /opt/unbted/unbted-1.2.jar "$@"
 ```
-
-Note: The JAR build starts up a good bit slower and requires a JRE be available.
 
 ## Features
 
@@ -51,17 +44,12 @@ Note: The JAR build starts up a good bit slower and requires a JRE be available.
 * Scripting
 
 ## Building
-`gradle fatJar` for a fast build that emits a large artifact, `gradle build` for 
-an optimized artifact, `gradle nativeImage` for the native executable. 
-(nativeImage requires Graal native-image on your PATH as well as musl-gcc and a 
-static build of zlib for musl.)
-
-All emit into `build/libs`.
+`gradle build`, as per usual. Your JAR will be in build/libs.
 
 ## License
 ```
 unbted - Una's NBT Editor
-Copyright (C) 2018 - 2020 Una Thompson (unascribed)
+Copyright (C) 2018 - 2023 Una Thompson (unascribed)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

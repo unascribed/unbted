@@ -1,6 +1,6 @@
 /*
  * unbted - Una's NBT Editor
- * Copyright (C) 2018 - 2020 Una Thompson (unascribed)
+ * Copyright (C) 2018 - 2023 Una Thompson (unascribed)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,8 +33,10 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
@@ -46,6 +48,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Resources;
@@ -193,7 +196,7 @@ public class NBTEd {
 		}
 		if (set.has("version")) {
 			System.err.println("Una's NBT Editor v"+VERSION);
-			System.err.println("Copyright (C) 2018 - 2020 Una Thompson (unascribed)");
+			System.err.println("Copyright (C) 2018 - 2022 Una Thompson (unascribed)");
 			System.err.println("License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.");
 			System.err.println("This is free software: you are free to change and redistribute it.");
 			System.err.println("There is NO WARRANTY, to the extent permitted by law.");
@@ -507,6 +510,15 @@ public class NBTEd {
 			for (NBTTag t : in.values()) {
 				out.add((roundTrip ? getTypePrefix(t)+":" : "")+t.getName(), toJson(t, roundTrip));
 			}
+			if (!roundTrip) {
+				List<String> keys = Lists.newArrayList(out.keySet());
+				Collections.sort(keys);
+				JsonObject sorted = new JsonObject();
+				for (String k : keys) {
+					sorted.add(k, out.get(k));
+				}
+				out = sorted;
+			}
 			return out;
 		} else if (tag instanceof NBTList) {
 			JsonArray out = new JsonArray();
@@ -545,7 +557,7 @@ public class NBTEd {
 	
 	public static void displayEmbeddedFileInPager(String file) throws Exception {
 		if (PAGER && !"dumb".equals(terminal.getType())) {
-			Less less = new Less(NBTEd.terminal);
+			Less less = new Less(NBTEd.terminal, new File("").toPath());
 			less.run(new URLSource(ClassLoader.getSystemResource(file), file));
 		} else {
 			Resources.copy(ClassLoader.getSystemResource(file), System.err);
