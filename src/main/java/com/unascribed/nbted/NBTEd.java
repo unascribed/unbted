@@ -325,6 +325,8 @@ public class NBTEd {
 					detectedCompressionMethod = Compression.GZIP;
 				} else if (magic8 == 0x78) {
 					detectedCompressionMethod = Compression.DEFLATE;
+				} else if (magic16 == 0xb528) {
+					detectedCompressionMethod = Compression.ZSTD;
 				} else {
 					detectedCompressionMethod = Compression.NONE;
 				}

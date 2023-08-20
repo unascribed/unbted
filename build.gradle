@@ -81,6 +81,9 @@ license {
 	matching('**/io/github/steveice10/opennbt/**') {
 		header = file('opennbt-LICENSE')
 	}
+	matching('**/io/airlift/compress/**') {
+		header = file('aircompressor-LICENSE')
+	}
 }
 
 tasks.build.dependsOn proguardJar

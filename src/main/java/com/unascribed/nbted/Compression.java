@@ -26,12 +26,17 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
+import io.airlift.compress.zstd.ZstdInputStream;
+import io.airlift.compress.zstd.ZstdOutputStream;
+
 public enum Compression {
 	NONE("None"),
 	DEFLATE("Deflate"),
-	GZIP("GZip");
+	GZIP("GZip"),
+	ZSTD("ZStandard"),
+	;
 	private final String name;
-	private Compression(String name) {
+	Compression(String name) {
 		this.name = name;
 	}
 	
@@ -41,6 +46,7 @@ public enum Compression {
 			case NONE: return is;
 			case DEFLATE: return new InflaterInputStream(is);
 			case GZIP: return new GZIPInputStream(is);
+			case ZSTD: return new ZstdInputStream(is);
 			default: throw new AssertionError("missing case for "+this);
 		}
 	}
@@ -51,6 +57,7 @@ public enum Compression {
 			case NONE: return os;
 			case DEFLATE: return new DeflaterOutputStream(os);
 			case GZIP: return new GZIPOutputStream(os);
+			case ZSTD: return new ZstdOutputStream(os);
 			default: throw new AssertionError("missing case for "+this);
 		}
 	}

@@ -435,7 +435,7 @@ public class CommandProcessor implements Completer, Highlighter {
 				} else if (set.has("big-endian")) {
 					endianness = Endianness.BIG;
 				} else {
-					endianness = fileInfo.endianness;
+					endianness = fileInfo.endianness == null ? Endianness.BIG : fileInfo.endianness;
 				}
 				Compression compression;
 				if (set.has("compression")) {
@@ -494,6 +494,16 @@ public class CommandProcessor implements Completer, Highlighter {
 						if (outFile.getName().endsWith(".json.gz") || outFile.getName().endsWith(".json")) {
 							if (!prompt("You are saving an NBT file with a JSON extension. Are you sure you want to do this?", false)) {
 								return;
+							}
+						} else if (compression == Compression.ZSTD) {
+							if (outFile.getName().endsWith(".dat") || outFile.getName().endsWith(".nbt")) {
+								if (!prompt("You are saving a non-standard Zstd NBT file with a standard extension. Are you sure you want to do this?", true)) {
+									return;
+								}
+							} else if (!outFile.getName().endsWith(".zat") && !outFile.getName().endsWith(".znbt")) {
+								if (!prompt("You are saving a non-standard Zstd NBT file with an unknown extension. Are you sure you want to do this?", true)) {
+									return;
+								}
 							}
 						} else if (!outFile.getName().endsWith(".dat") && !outFile.getName().endsWith(".nbt")) {
 							if (!prompt("You are saving an NBT file with a nonstandard extension. Are you sure you want to do this?", true)) {
