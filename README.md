@@ -1,11 +1,16 @@
 <a href="https://asciinema.org/a/201725" target="_blank"><img width="320" align="right" src="https://asciinema.org/a/201725.svg" /></a>
 # Una's NBT Editor
 
+**Note**: This repository is primarily on [Forgejo](https://git.sleeping.town/unascribed/unbted) —
+the GitHub repository is a mirror. To contribute to this repository, you must do it on Forgejo. You
+can log in to Forgejo with a GitHub account.
+
 unbted (**U**na's **NBT** **Ed**itor) is a command-line interactive NBT editor. That's about it, really.
 Since it's command-line, it can be easily used over SSH connections on remote servers, instead of having to download the file and edit it locally with one of the many GUI editors.
 
 ## Downloads
-Releases are [here on GitHub](https://github.com/unascribed/unbted/releases).
+Releases are [on Forgejo](https://git.sleeping.town/unascribed/unbted/releases). 1.2.1 and prior are
+also on GitHub.
 
 ## Running
 Run the JAR (e.g. unbted-1.2.jar) with any JRE. You can then put a shell script like the following
@@ -30,8 +35,8 @@ java -jar /opt/unbted/unbted-1.2.jar "$@"
 * Support for all NBT tags, including int and long arrays
 * Full help included
   * Since the help is just plain text files, you can view it online:
-    * Usage: https://github.com/unascribed/unbted/blob/master/src/main/resources/switches-help.txt
-    * Commands: https://github.com/unascribed/unbted/blob/master/src/main/resources/commands-help.txt
+    * Usage: https://git.sleeping.town/unascribed/unbted/src/branch/trunk/src/main/resources/switches-help.txt
+    * Commands: https://git.sleeping.town/unascribed/unbted/src/branch/trunk/src/main/resources/commands-help.txt
 * Full line editing and tab completion
 * Persistent history
 * Compression autodetection
